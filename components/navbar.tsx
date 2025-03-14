@@ -11,16 +11,17 @@ export function Navbar() {
   const navItems = [
     { name: "Home", path: "/" },
     { name: "Generate", path: "/generate" },
+    { name: "Preview", path: "/preview" },
     { name: "Pose Library", path: "/pose-library" },
     { name: "Flows", path: "/flows" },
   ]
 
   return (
-    <header className="border-b border-muted" style={{ backgroundColor: "#F3F1EB" }}>
+    <header className="border-b border-muted bg-background">
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
         <div className="flex items-center space-x-2">
           <Link href="/" className="flex items-center space-x-2">
-            <HandDrawnSpiral width={32} height={32} color="#2E43FF" strokeWidth={1.5} />
+            <HandDrawnSpiral width={32} height={32} color="hsl(var(--primary))" strokeWidth={1.5} />
             <span className="text-xl font-sans font-medium">Sequence</span>
           </Link>
         </div>
@@ -32,8 +33,8 @@ export function Navbar() {
               href={item.path}
               className={`py-2 font-sans ${
                 pathname === item.path
-                  ? "text-[#2E43FF] border-b-2 border-[#2E43FF]"
-                  : "text-foreground hover:text-[#2E43FF]"
+                  ? "text-primary border-b-2 border-primary"
+                  : "text-foreground hover:text-primary"
               }`}
             >
               {item.name}
@@ -45,7 +46,7 @@ export function Navbar() {
           <Button variant="outline" asChild className="mr-2">
             <Link href="/login">Sign In</Link>
           </Button>
-          <Button asChild style={{ backgroundColor: "#2E43FF" }} className="hover:bg-opacity-90">
+          <Button asChild>
             <Link href="/signup">Sign Up</Link>
           </Button>
         </div>

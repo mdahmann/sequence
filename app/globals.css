@@ -5,13 +5,13 @@
 @layer base {
   :root {
     --background: 39 14% 93%;
-    --foreground: 0 0% 20%;
+    --foreground: 35 6% 20%;
 
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 20%;
+    --card-foreground: 35 6% 20%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 20%;
+    --popover-foreground: 35 6% 20%;
 
     --primary: 233 100% 59%;
     --primary-foreground: 0 0% 100%;
@@ -20,7 +20,7 @@
     --secondary-foreground: 0 0% 100%;
 
     --muted: 26 23% 80%;
-    --muted-foreground: 0 0% 45%;
+    --muted-foreground: 35 6% 40%;
 
     --accent: 14 75% 56%;
     --accent-foreground: 0 0% 100%;
@@ -60,7 +60,7 @@
 
 @layer components {
   .btn-primary {
-    @apply bg-[#2E43FF] text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-200 hover:-translate-y-1;
+    @apply bg-primary text-primary-foreground rounded-lg shadow-md hover:shadow-lg transition-all duration-200 hover:-translate-y-1;
   }
 
   .card-base {
@@ -68,7 +68,7 @@
   }
 
   .form-input {
-    @apply border-muted bg-white rounded-md focus:ring-[#2E43FF] focus:border-[#2E43FF];
+    @apply border-muted bg-white rounded-md focus:ring-primary focus:border-primary;
   }
 }
 

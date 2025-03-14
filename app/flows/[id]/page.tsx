@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from "@/lib/supabase"
 import { notFound, redirect } from "next/navigation"
 import { SequenceEditor } from "./components/sequence-editor"
+import { PageContainer } from "@/components/page-container"
 
 export default async function FlowPage({ params }: { params: { id: string } }) {
   const supabase = createServerSupabaseClient()
@@ -38,15 +39,15 @@ export default async function FlowPage({ params }: { params: { id: string } }) {
   }
 
   // Sort the poses by position
-  sequence.sequence_poses.sort((a, b) => a.position - b.position)
+  sequence.sequence_poses.sort((a: any, b: any) => a.position - b.position)
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <PageContainer>
       <h1 className="text-3xl font-bold mb-2">{sequence.title}</h1>
       <p className="text-muted-foreground mb-8">{sequence.description}</p>
 
       <SequenceEditor sequence={sequence} />
-    </div>
+    </PageContainer>
   )
 }
 

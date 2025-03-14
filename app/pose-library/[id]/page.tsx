@@ -3,12 +3,14 @@ import { notFound } from "next/navigation"
 import { PoseDetail } from "./components/pose-detail"
 import { RelatedPoses } from "./components/related-poses"
 import type { Pose } from "@/types/pose"
+import { PageContainer } from "@/components/page-container"
 
 export default async function PoseDetailPage({ params }: { params: { id: string } }) {
   const supabase = createServerSupabaseClient()
+  const poseId = params.id
 
   // Fetch the pose details
-  const { data: pose, error } = await supabase.from("poses").select("*").eq("id", params.id).single()
+  const { data: pose, error } = await supabase.from("poses").select("*").eq("id", poseId).single()
 
   if (error || !pose) {
     notFound()
@@ -29,11 +31,11 @@ export default async function PoseDetailPage({ params }: { params: { id: string 
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <PageContainer>
       <PoseDetail pose={pose as Pose} />
 
       {relatedPoses.length > 0 && <RelatedPoses pose={pose as Pose} relatedPoses={relatedPoses} />}
-    </div>
+    </PageContainer>
   )
 }
 

@@ -1,18 +1,17 @@
-import { LoginForm } from "./components/login-form"
+import { SignupForm } from "./components/signup-form"
 import { PageContainer } from "@/components/page-container"
 
-export default function LoginPage() {
+export default function SignupPage() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh]">
       <PageContainer maxWidth="narrow" centered>
-        <h1 className="text-4xl font-normal text-center mb-4">Sign In</h1>
+        <h1 className="text-4xl font-normal text-center mb-4">Sign Up</h1>
         <p className="text-center text-muted-foreground mb-8">
-          Sign in to your account to save and manage your yoga sequences.
+          Create an account to save and manage your yoga sequences.
         </p>
 
-        <LoginForm />
+        <SignupForm />
       </PageContainer>
     </div>
   )
-}
-
+} 

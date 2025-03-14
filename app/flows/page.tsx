@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from "@/lib/supabase"
 import { redirect } from "next/navigation"
 import { FlowsList } from "./components/flows-list"
+import { PageContainer } from "@/components/page-container"
 
 export default async function FlowsPage() {
   const supabase = createServerSupabaseClient()
@@ -36,12 +37,12 @@ export default async function FlowsPage() {
     .order("created_at", { ascending: false })
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <PageContainer>
       <h1 className="text-4xl font-normal text-center mb-4">Your Flows</h1>
       <p className="text-lg text-center text-muted-foreground mb-12">View and manage your saved yoga sequences.</p>
 
       <FlowsList sequences={sequences || []} />
-    </div>
+    </PageContainer>
   )
 }
 

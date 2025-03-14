@@ -10,7 +10,7 @@ import { publicSans, merriweather } from "./fonts"
 export const metadata: Metadata = {
   title: "Sequence - AI-Powered Yoga Sequence Builder",
   description: "Create flowing, intuitive yoga sequences with mindful transitions and balanced energy.",
-    generator: 'v0.dev'
+  generator: 'v0.dev'
 }
 
 export default function RootLayout({
@@ -19,9 +19,9 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={`${publicSans.variable} ${merriweather.variable}`}>
-      <body className="min-h-screen flex flex-col" style={{ backgroundColor: "#F3F1EB" }}>
-        <ThemeProvider attribute="class" defaultTheme="light">
+    <html lang="en" className={`${publicSans.variable} ${merriweather.variable}`} suppressHydrationWarning>
+      <body className="min-h-screen flex flex-col bg-background">
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} forcedTheme="light">
           <Navbar />
           <main className="flex-1">{children}</main>
           <Footer />

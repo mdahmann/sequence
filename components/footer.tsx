@@ -3,10 +3,10 @@ import HandDrawnSpiral from "./hand-drawn-spiral"
 
 export function Footer() {
   return (
-    <footer className="w-full border-t border-muted" style={{ backgroundColor: "#F3F1EB" }}>
+    <footer className="w-full border-t border-muted bg-background">
       <div className="container mx-auto px-4 h-14 flex items-center justify-between text-sm">
         <div className="flex items-center space-x-2">
-          <HandDrawnSpiral width={20} height={20} color="#2E43FF" strokeWidth={1.5} />
+          <HandDrawnSpiral width={20} height={20} color="hsl(var(--primary))" strokeWidth={1.5} />
           <span>Sequence</span>
         </div>
 

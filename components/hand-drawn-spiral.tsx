@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import { cn } from "@/lib/utils"
 
 interface HandDrawnSpiralProps {
   className?: string
@@ -18,7 +19,7 @@ const HandDrawnSpiral: React.FC<HandDrawnSpiralProps> = ({
   width = 24,
   height = 24,
   strokeWidth = 1.5,
-  color = "currentColor",
+  color = "hsl(var(--primary))",
   animate = false,
   onMouseEnter,
   onMouseLeave,
@@ -59,7 +60,7 @@ const HandDrawnSpiral: React.FC<HandDrawnSpiralProps> = ({
       strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={className}
+      className={cn("transition-colors", className)}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
