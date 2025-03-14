@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 39 14% 93%;
+    --foreground: 0 0% 20%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 20%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 20%;
+
+    --primary: 233 100% 59%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 24 4% 52%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 26 23% 80%;
+    --muted-foreground: 0 0% 45%;
+
+    --accent: 14 75% 56%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 85% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 30 6% 83%;
+    --input: 30 6% 83%;
+    --ring: 30 6% 83%;
+
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    background-color: #f3f1eb;
+  }
+
+  h1 {
+    @apply font-sans font-normal;
+  }
+
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-serif font-normal;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-[#2E43FF] text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-200 hover:-translate-y-1;
+  }
+
+  .card-base {
+    @apply bg-card border-muted rounded-lg shadow-sm;
+  }
+
+  .form-input {
+    @apply border-muted bg-white rounded-md focus:ring-[#2E43FF] focus:border-[#2E43FF];
+  }
+}
+
+@keyframes drawSpiral {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
