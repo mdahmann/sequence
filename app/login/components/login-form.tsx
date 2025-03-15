@@ -94,7 +94,7 @@ export function LoginForm() {
   }
 
   return (
-    <Card className="max-w-[500px] mx-auto">
+    <Card className="w-[500px] max-w-full mx-auto sm:w-[500px]">
       <CardContent className="pt-6">
         {message && <div className="bg-primary/10 text-primary p-3 rounded-md mb-4">{message}</div>}
         {error && <div className="bg-destructive/10 text-destructive p-3 rounded-md mb-4">{error}</div>}
