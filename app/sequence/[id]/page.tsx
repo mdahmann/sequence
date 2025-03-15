@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef, createRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { LoadingSpinner } from "@/components/ui-enhanced/loading-spinner"
@@ -37,7 +37,6 @@ export default function SequenceEditorPage() {
   const [dragOverPhaseId, setDragOverPhaseId] = useState<string | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [isExiting, setIsExiting] = useState(false)
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isEditingSettings, setIsEditingSettings] = useState(false)
   const [tempSettings, setTempSettings] = useState<{
     name: string;
@@ -47,6 +46,52 @@ export default function SequenceEditorPage() {
     style: string;
     focus: string;
   } | null>(null)
+  
+  // Create refs for each phase to enable scrolling
+  const phaseRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const headerHeight = 73; // Approximate height of the header in pixels
+  
+  // Update refs when phases change
+  useEffect(() => {
+    if (sequence) {
+      // Initialize refs array with the correct length
+      phaseRefs.current = Array(sequence.phases.length).fill(null);
+    }
+  }, [sequence?.phases?.length]);
+  
+  // Scroll to phase when selected
+  const scrollToPhase = (index: number) => {
+    if (sequence && phaseRefs.current[index]) {
+      const phaseElement = phaseRefs.current[index];
+      if (phaseElement) {
+        // Scroll the phase into view with an offset for the header
+        const yOffset = -headerHeight - 16; // Additional 16px for some padding
+        const y = phaseElement.getBoundingClientRect().top + window.pageYOffset + yOffset;
+        
+        window.scrollTo({
+          top: y,
+          behavior: 'smooth'
+        });
+        
+        // Expand the phase if it's collapsed
+        if (!expandedPhases.includes(sequence.phases[index].id)) {
+          togglePhaseExpansion(sequence.phases[index].id);
+        }
+        
+        // Add a brief highlight animation to the phase
+        phaseElement.classList.add('phase-highlight');
+        setTimeout(() => {
+          phaseElement.classList.remove('phase-highlight');
+        }, 1500);
+      }
+    }
+  };
+  
+  // Handle navigator item click
+  const handlePhaseSelect = (index: number) => {
+    setSelectedPhaseIndex(index);
+    scrollToPhase(index);
+  };
   
   // Fetch sequence data from localStorage (beta approach)
   useEffect(() => {
@@ -402,7 +447,7 @@ export default function SequenceEditorPage() {
     }
   }, [sequence]);
 
-  const handleEditSettings = () => {
+  const handleStartEditing = () => {
     if (!isEditingSettings && sequence) {
       setTempSettings({
         name: sequence.name,
@@ -412,8 +457,8 @@ export default function SequenceEditorPage() {
         style: sequence.style,
         focus: sequence.focus
       });
+      setIsEditingSettings(true);
     }
-    setIsEditingSettings(!isEditingSettings);
   }
 
   const handleSettingsSave = () => {
@@ -514,7 +559,7 @@ export default function SequenceEditorPage() {
             {sequence.phases.map((phase, index) => (
               <button
                 key={phase.id}
-                onClick={() => setSelectedPhaseIndex(index)}
+                onClick={() => handlePhaseSelect(index)}
                 className={cn(
                   "w-full text-left px-3 py-2 rounded-md mb-2 transition-colors whitespace-nowrap",
                   selectedPhaseIndex === index 
@@ -568,27 +613,24 @@ export default function SequenceEditorPage() {
               </button>
             </div>
 
-            {/* Center: Title with Edit Icon */}
-            <div className="flex items-center gap-2">
+            {/* Center: Title */}
+            <div 
+              className="flex items-center gap-2 cursor-pointer group max-w-xl w-full mx-auto"
+              onClick={isEditingSettings ? undefined : handleStartEditing}
+            >
               {isEditingSettings ? (
                 <input
                   type="text"
                   value={tempSettings?.name || ''}
                   onChange={(e) => setTempSettings({...tempSettings!, name: e.target.value})}
-                  className="text-xl font-semibold bg-transparent border-b border-dashed border-gray-400 focus:outline-none focus:border-vibrant-blue px-1"
+                  className="text-xl font-semibold bg-transparent border-b border-dashed border-gray-400 focus:outline-none focus:border-vibrant-blue px-1 w-full"
+                  autoFocus
                 />
               ) : (
-                <h1 className="text-xl font-semibold">{sequence.name}</h1>
+                <h1 className="text-xl font-semibold group-hover:text-vibrant-blue transition-colors text-center w-full truncate">
+                  {sequence.name}
+                </h1>
               )}
-              <button 
-                onClick={handleEditSettings}
-                className={cn(
-                  "p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md",
-                  isEditingSettings && "bg-vibrant-blue/10 text-vibrant-blue"
-                )}
-              >
-                <Pencil className="h-4 w-4" />
-              </button>
             </div>
 
             {/* Right: Export and Save Buttons */}
@@ -636,7 +678,14 @@ export default function SequenceEditorPage() {
         <div className="p-6">
           {/* Stats Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div className="bg-warm-white dark:bg-deep-charcoal-light rounded-lg p-4 shadow-sm">
+            {/* Duration */}
+            <div 
+              className={cn(
+                "bg-warm-white dark:bg-deep-charcoal-light rounded-lg p-4 shadow-sm",
+                !isEditingSettings && "cursor-pointer hover:border-vibrant-blue/50 hover:shadow-md transition-shadow"
+              )}
+              onClick={isEditingSettings ? undefined : handleStartEditing}
+            >
               <div className="text-sm text-gray-500 dark:text-gray-400">Duration</div>
               {isEditingSettings ? (
                 <div>
@@ -649,10 +698,18 @@ export default function SequenceEditorPage() {
                   />
                 </div>
               ) : (
-                <div className="text-xl font-semibold">{totalDuration.toFixed(1)} min</div>
+                <div className="text-xl font-semibold group-hover:text-vibrant-blue">{totalDuration.toFixed(1)} min</div>
               )}
             </div>
-            <div className="bg-warm-white dark:bg-deep-charcoal-light rounded-lg p-4 shadow-sm">
+            
+            {/* Difficulty */}
+            <div 
+              className={cn(
+                "bg-warm-white dark:bg-deep-charcoal-light rounded-lg p-4 shadow-sm",
+                !isEditingSettings && "cursor-pointer hover:border-vibrant-blue/50 hover:shadow-md transition-shadow"
+              )}
+              onClick={isEditingSettings ? undefined : handleStartEditing}
+            >
               <div className="text-sm text-gray-500 dark:text-gray-400">Difficulty</div>
               {isEditingSettings ? (
                 <select
@@ -668,7 +725,15 @@ export default function SequenceEditorPage() {
                 <div className="text-xl font-semibold capitalize">{sequence.difficulty}</div>
               )}
             </div>
-            <div className="bg-warm-white dark:bg-deep-charcoal-light rounded-lg p-4 shadow-sm">
+            
+            {/* Style */}
+            <div 
+              className={cn(
+                "bg-warm-white dark:bg-deep-charcoal-light rounded-lg p-4 shadow-sm",
+                !isEditingSettings && "cursor-pointer hover:border-vibrant-blue/50 hover:shadow-md transition-shadow"
+              )}
+              onClick={isEditingSettings ? undefined : handleStartEditing}
+            >
               <div className="text-sm text-gray-500 dark:text-gray-400">Style</div>
               {isEditingSettings ? (
                 <select
@@ -686,7 +751,15 @@ export default function SequenceEditorPage() {
                 <div className="text-xl font-semibold capitalize">{sequence.style}</div>
               )}
             </div>
-            <div className="bg-warm-white dark:bg-deep-charcoal-light rounded-lg p-4 shadow-sm">
+            
+            {/* Focus */}
+            <div 
+              className={cn(
+                "bg-warm-white dark:bg-deep-charcoal-light rounded-lg p-4 shadow-sm",
+                !isEditingSettings && "cursor-pointer hover:border-vibrant-blue/50 hover:shadow-md transition-shadow"
+              )}
+              onClick={isEditingSettings ? undefined : handleStartEditing}
+            >
               <div className="text-sm text-gray-500 dark:text-gray-400">Focus</div>
               {isEditingSettings ? (
                 <select
@@ -726,9 +799,11 @@ export default function SequenceEditorPage() {
             {sequence.phases.map((phase, phaseIndex) => (
               <div
                 key={phase.id}
+                ref={(el) => { phaseRefs.current[phaseIndex] = el; }}
                 className={cn(
                   "bg-warm-white dark:bg-deep-charcoal-light rounded-lg shadow-sm overflow-hidden",
-                  dragOverPhaseId === phase.id && "ring-2 ring-vibrant-blue"
+                  dragOverPhaseId === phase.id && "ring-2 ring-vibrant-blue",
+                  selectedPhaseIndex === phaseIndex && "ring-1 ring-vibrant-blue"
                 )}
               >
                 <button
