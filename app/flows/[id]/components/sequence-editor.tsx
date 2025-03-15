@@ -13,6 +13,7 @@ import { toast } from "@/components/ui/use-toast"
 import { formatCategory } from "@/lib/utils"
 import { useSupabase } from "@/components/providers"
 import { Input } from "@/components/ui/input"
+import { PoseSelectionModal } from "./pose-selection-modal"
 
 interface Pose {
   id: string
@@ -63,6 +64,8 @@ export function SequenceEditor({ sequence, isOwner = true }: SequenceEditorProps
   const [sequenceTitle, setSequenceTitle] = useState(sequence.title)
   const [isSaving, setIsSaving] = useState(false)
   const [flowBlocks, setFlowBlocks] = useState<FlowBlock[]>([])
+  const [isPoseModalOpen, setIsPoseModalOpen] = useState(false)
+  const [activeBlockId, setActiveBlockId] = useState<string | null>(null)
 
   // Set up DnD sensors
   const sensors = useSensors(
@@ -283,13 +286,95 @@ export function SequenceEditor({ sequence, isOwner = true }: SequenceEditorProps
   const showEditControls = isOwner;
 
   const handleAddPose = (blockId: string) => {
-    // This would typically open a pose selection modal
-    // For now, we'll just show a toast
-    toast({
-      title: "Add Pose",
-      description: "Pose selection modal would open here",
-    });
-  };
+    setActiveBlockId(blockId)
+    setIsPoseModalOpen(true)
+  }
+
+  const handlePoseSelect = async (pose: Pose) => {
+    if (!activeBlockId) return
+
+    try {
+      // Find the block
+      const block = flowBlocks.find(b => b.id === activeBlockId)
+      if (!block) return
+
+      // Create a new sequence pose in the database
+      const { data: newPose, error } = await supabase
+        .from("sequence_poses")
+        .insert({
+          sequence_id: sequence.id,
+          pose_id: pose.id,
+          position: (block.poses.length > 0 
+            ? Math.max(...block.poses.map(p => p.position)) + 10 
+            : 0),
+          duration: 30, // Default duration
+          side: "", // Default side
+          cues: "", // Default cues
+        })
+        .select("*, poses(*)")
+        .single()
+
+      if (error) throw error
+
+      // Update the flow blocks with the new pose
+      setFlowBlocks(prevBlocks => {
+        return prevBlocks.map(block => {
+          if (block.id !== activeBlockId) return block
+
+          return {
+            ...block,
+            poses: [...block.poses, newPose]
+          }
+        })
+      })
+
+      toast({
+        title: "Success",
+        description: `Added ${pose.english_name} to the sequence`,
+      })
+    } catch (error) {
+      console.error("Error adding pose:", error)
+      toast({
+        title: "Error",
+        description: "Failed to add pose to sequence",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeletePose = async (poseId: string) => {
+    try {
+      // Delete the pose from the database
+      const { error } = await supabase
+        .from("sequence_poses")
+        .delete()
+        .eq("id", poseId)
+
+      if (error) throw error
+
+      // Update the flow blocks by removing the deleted pose
+      setFlowBlocks(prevBlocks => {
+        return prevBlocks.map(block => {
+          return {
+            ...block,
+            poses: block.poses.filter(pose => pose.id !== poseId)
+          }
+        })
+      })
+
+      toast({
+        title: "Success",
+        description: "Pose removed from sequence",
+      })
+    } catch (error) {
+      console.error("Error deleting pose:", error)
+      toast({
+        title: "Error",
+        description: "Failed to remove pose from sequence",
+        variant: "destructive",
+      })
+    }
+  }
 
   return (
     <div className="space-y-8">
@@ -373,6 +458,7 @@ export function SequenceEditor({ sequence, isOwner = true }: SequenceEditorProps
                     onCueChange={(cues) => handleCueChange(pose.id, cues)}
                     onSideChange={(side) => handleSideChange(pose.id, side)}
                     onDurationChange={(duration) => handleDurationChange(pose.id, duration)}
+                    onDelete={handleDeletePose}
                     isEditable={showEditControls}
                   />
                 ))}
@@ -395,6 +481,13 @@ export function SequenceEditor({ sequence, isOwner = true }: SequenceEditorProps
           )}
         </div>
       ))}
+
+      <PoseSelectionModal
+        isOpen={isPoseModalOpen}
+        onClose={() => setIsPoseModalOpen(false)}
+        onPoseSelect={handlePoseSelect}
+        blockId={activeBlockId || ""}
+      />
     </div>
   );
 }
