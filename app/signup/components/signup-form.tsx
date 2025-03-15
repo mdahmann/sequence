@@ -97,8 +97,8 @@ export function SignupForm() {
   }
 
   return (
-    <Card>
-      <CardContent className="pt-6">
+    <Card className="w-full">
+      <CardContent className="pt-8 px-8">
         {message && <div className="bg-primary/10 text-primary p-3 rounded-md mb-4">{message}</div>}
 
         <form onSubmit={handleSignup} className="space-y-4">
@@ -163,7 +163,7 @@ export function SignupForm() {
         </Button>
       </CardContent>
 
-      <CardFooter className="flex flex-col space-y-4 border-t pt-6">
+      <CardFooter className="flex flex-col space-y-4 border-t pt-6 pb-8 px-8">
         <div className="text-center text-sm">
           Already have an account?{" "}
           <Button variant="link" className="p-0 h-auto" asChild>
