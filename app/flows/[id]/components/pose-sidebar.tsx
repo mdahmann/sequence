@@ -30,12 +30,16 @@ export function PoseSidebar({ onPoseSelect }: PoseSidebarProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [categories, setCategories] = useState<string[]>([])
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
+  const [draggedPose, setDraggedPose] = useState<Pose | null>(null)
 
   useEffect(() => {
     const fetchPoses = async () => {
       try {
         setIsLoading(true)
-        const { data, error } = await supabase.from("poses").select("*")
+        const { data, error } = await supabase
+          .from("poses")
+          .select("*")
+          .order("english_name")
         
         if (error) {
           console.error("Error fetching poses:", error)
@@ -93,8 +97,32 @@ export function PoseSidebar({ onPoseSelect }: PoseSidebarProps) {
   }
 
   const handleDragStart = (e: React.DragEvent, pose: Pose) => {
-    e.dataTransfer.setData("pose", JSON.stringify(pose))
-    e.dataTransfer.effectAllowed = "copy"
+    console.log("Drag started with pose:", pose.english_name);
+    setDraggedPose(pose);
+    
+    // Set the drag data
+    e.dataTransfer.setData("pose", JSON.stringify(pose));
+    e.dataTransfer.setData("text/plain", pose.english_name);
+    e.dataTransfer.effectAllowed = "copy";
+    
+    // Create a drag image
+    const dragImage = document.createElement("div");
+    dragImage.className = "bg-background border rounded-md p-2 shadow-md";
+    dragImage.textContent = pose.english_name;
+    document.body.appendChild(dragImage);
+    dragImage.style.position = "absolute";
+    dragImage.style.top = "-1000px";
+    
+    e.dataTransfer.setDragImage(dragImage, 0, 0);
+    
+    // Clean up the drag image after a short delay
+    setTimeout(() => {
+      document.body.removeChild(dragImage);
+    }, 100);
+  }
+  
+  const handleDragEnd = () => {
+    setDraggedPose(null);
   }
 
   return (
@@ -134,9 +162,12 @@ export function PoseSidebar({ onPoseSelect }: PoseSidebarProps) {
             filteredPoses.map((pose) => (
               <Card 
                 key={pose.id} 
-                className="cursor-grab hover:bg-accent/50 transition-colors"
+                className={`cursor-grab hover:bg-accent/50 transition-colors ${
+                  draggedPose?.id === pose.id ? 'opacity-50' : ''
+                }`}
                 draggable
                 onDragStart={(e) => handleDragStart(e, pose)}
+                onDragEnd={handleDragEnd}
               >
                 <CardContent className="p-3 flex items-center justify-between">
                   <div>

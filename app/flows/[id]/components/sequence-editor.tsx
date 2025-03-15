@@ -13,7 +13,6 @@ import { toast } from "@/components/ui/use-toast"
 import { formatCategory } from "@/lib/utils"
 import { useSupabase } from "@/components/providers"
 import { Input } from "@/components/ui/input"
-import { PoseSelectionModal } from "./pose-selection-modal"
 import { PoseSidebar } from "./pose-sidebar"
 
 interface Pose {
@@ -66,7 +65,6 @@ export function SequenceEditor({ sequence, isOwner = true }: SequenceEditorProps
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [flowBlocks, setFlowBlocks] = useState<FlowBlock[]>([])
-  const [isPoseModalOpen, setIsPoseModalOpen] = useState(false)
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null)
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
 
@@ -290,11 +288,26 @@ export function SequenceEditor({ sequence, isOwner = true }: SequenceEditorProps
 
   const handleAddPose = (blockId: string) => {
     setActiveBlockId(blockId)
-    setIsPoseModalOpen(true)
+    // Instead of opening modal, just open the sidebar if it's closed
+    if (!isSidebarOpen) {
+      setIsSidebarOpen(true)
+    }
   }
 
   const handlePoseSelect = async (pose: Pose) => {
-    if (!activeBlockId) return
+    if (!activeBlockId) {
+      // If no active block is set, use the first block
+      if (flowBlocks.length > 0) {
+        setActiveBlockId(flowBlocks[0].id)
+      } else {
+        toast({
+          title: "Error",
+          description: "No flow blocks available to add poses to",
+          variant: "destructive",
+        })
+        return
+      }
+    }
 
     try {
       // Find the block
@@ -391,16 +404,33 @@ export function SequenceEditor({ sequence, isOwner = true }: SequenceEditorProps
   const handleDragOver = (e: React.DragEvent, blockId: string) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "copy";
+    // Highlight the drop area
+    const target = e.currentTarget as HTMLElement;
+    target.classList.add("bg-accent/50", "border-primary");
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    // Remove highlight from the drop area
+    const target = e.currentTarget as HTMLElement;
+    target.classList.remove("bg-accent/50", "border-primary");
   };
 
   const handleDrop = async (e: React.DragEvent, blockId: string) => {
     e.preventDefault();
     
+    // Remove highlight from the drop area
+    const target = e.currentTarget as HTMLElement;
+    target.classList.remove("bg-accent/50", "border-primary");
+    
     try {
       const poseData = e.dataTransfer.getData("pose");
-      if (!poseData) return;
+      if (!poseData) {
+        console.error("No pose data found in drop event");
+        return;
+      }
       
       const pose = JSON.parse(poseData) as Pose;
+      console.log("Dropped pose:", pose);
       
       // Set the active block and add the pose
       setActiveBlockId(blockId);
@@ -529,30 +559,20 @@ export function SequenceEditor({ sequence, isOwner = true }: SequenceEditorProps
             
             {showEditControls && (
               <div 
-                className="mt-4 ml-10"
+                className="mt-4 ml-10 p-4 border border-dashed rounded-md transition-colors"
                 onDragOver={(e) => handleDragOver(e, block.id)}
+                onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, block.id)}
+                onClick={() => handleAddPose(block.id)}
               >
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="w-full border-dashed"
-                  onClick={() => handleAddPose(block.id)}
-                >
+                <div className="flex items-center justify-center text-muted-foreground cursor-pointer">
                   <Plus className="h-4 w-4 mr-2" />
-                  Drag poses here to add to this phase
-                </Button>
+                  <span>Drag poses here from the sidebar to add to this phase</span>
+                </div>
               </div>
             )}
           </div>
         ))}
-
-        <PoseSelectionModal
-          isOpen={isPoseModalOpen}
-          onClose={() => setIsPoseModalOpen(false)}
-          onPoseSelect={handlePoseSelect}
-          blockId={activeBlockId || ""}
-        />
       </div>
 
       {/* Right sidebar for pose library */}
