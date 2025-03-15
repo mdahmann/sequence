@@ -9,9 +9,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { SortablePoseItem } from "./sortable-pose-item"
 import { Download, Save } from "lucide-react"
-import { createClientSupabaseClient } from "@/lib/supabase"
 import { toast } from "@/components/ui/use-toast"
 import { formatCategory } from "@/lib/utils"
+import { useSupabase } from "@/components/providers"
 
 interface SequencePose {
   id: string
@@ -48,7 +48,7 @@ interface SequenceEditorProps {
 
 export function SequenceEditor({ sequence }: SequenceEditorProps) {
   const router = useRouter()
-  const supabase = createClientSupabaseClient()
+  const { supabase } = useSupabase()
   const [items, setItems] = useState(sequence.sequence_poses)
   const [isSaving, setIsSaving] = useState(false)
 

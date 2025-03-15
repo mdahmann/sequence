@@ -1,12 +1,54 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import HandDrawnSpiral from "@/components/hand-drawn-spiral"
+import { useSupabase } from "@/components/providers"
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu"
+import { User } from "lucide-react"
 
 export function Navbar() {
   const pathname = usePathname()
+  const router = useRouter()
+  const { supabase } = useSupabase()
+  const [user, setUser] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    // Check for the current session when the component mounts
+    const checkSession = async () => {
+      setIsLoading(true)
+      const { data: { session } } = await supabase.auth.getSession()
+      setUser(session?.user || null)
+      setIsLoading(false)
+      
+      // Set up a listener for auth state changes
+      const { data: { subscription } } = await supabase.auth.onAuthStateChange(
+        (_event, session) => {
+          setUser(session?.user || null)
+        }
+      )
+      
+      return () => {
+        subscription.unsubscribe()
+      }
+    }
+    
+    checkSession()
+  }, [supabase])
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.refresh()
+  }
 
   const navItems = [
     { name: "Home", path: "/" },
@@ -43,12 +85,43 @@ export function Navbar() {
         </nav>
 
         <div className="flex items-center space-x-2">
-          <Button variant="outline" asChild className="mr-2">
-            <Link href="/login">Sign In</Link>
-          </Button>
-          <Button asChild>
-            <Link href="/signup">Sign Up</Link>
-          </Button>
+          {isLoading ? (
+            <div className="w-20 h-10 animate-pulse bg-muted rounded"></div>
+          ) : user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="mr-2">
+                  <User className="h-4 w-4 mr-2" />
+                  Account
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem className="text-sm">
+                  {user.email}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/flows">My Flows</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/account">Settings</Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut}>
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <>
+              <Button variant="outline" asChild className="mr-2">
+                <Link href="/login">Sign In</Link>
+              </Button>
+              <Button asChild>
+                <Link href="/signup">Sign Up</Link>
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </header>

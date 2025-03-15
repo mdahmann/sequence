@@ -9,19 +9,20 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Loader2, Mail } from "lucide-react"
-import { createClientSupabaseClient } from "@/lib/supabase"
 import { toast } from "@/components/ui/use-toast"
+import { useSupabase } from "@/components/providers"
 
 export function SignupForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirect = searchParams.get("redirect") || "/"
 
-  const supabase = createClientSupabaseClient()
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const { supabase } = useSupabase()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -36,7 +37,7 @@ export function SignupForm() {
       return
     }
     
-    setIsLoading(true)
+    setLoading(true)
 
     try {
       const { error } = await supabase.auth.signUp({
@@ -57,7 +58,7 @@ export function SignupForm() {
         variant: "destructive",
       })
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
@@ -71,7 +72,7 @@ export function SignupForm() {
       return
     }
 
-    setIsLoading(true)
+    setLoading(true)
 
     try {
       const { error } = await supabase.auth.signInWithOtp({
@@ -91,7 +92,7 @@ export function SignupForm() {
         variant: "destructive",
       })
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
@@ -135,8 +136,8 @@ export function SignupForm() {
             />
           </div>
 
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? (
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Signing up...
@@ -156,7 +157,7 @@ export function SignupForm() {
           </div>
         </div>
 
-        <Button type="button" variant="outline" className="w-full" onClick={handleMagicLinkSignup} disabled={isLoading}>
+        <Button type="button" variant="outline" className="w-full" onClick={handleMagicLinkSignup} disabled={loading}>
           <Mail className="mr-2 h-4 w-4" />
           Sign up with Magic Link
         </Button>

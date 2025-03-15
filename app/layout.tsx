@@ -5,6 +5,7 @@ import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
+import { Providers } from "@/components/providers"
 import { publicSans, merriweather } from "./fonts"
 
 export const metadata: Metadata = {
@@ -22,10 +23,12 @@ export default function RootLayout({
     <html lang="en" className={`${publicSans.variable} ${merriweather.variable}`} suppressHydrationWarning>
       <body className="min-h-screen flex flex-col bg-background">
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} forcedTheme="light">
-          <Navbar />
-          <main className="flex-1">{children}</main>
-          <Footer />
-          <Toaster />
+          <Providers>
+            <Navbar />
+            <main className="flex-1">{children}</main>
+            <Footer />
+            <Toaster />
+          </Providers>
         </ThemeProvider>
       </body>
     </html>

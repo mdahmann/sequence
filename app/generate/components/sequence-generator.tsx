@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -10,10 +10,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
-import { Loader2, Sparkles } from "lucide-react"
-import { createClientSupabaseClient } from "@/lib/supabase"
+import { Loader2, Sparkles, Info, AlertCircle } from "lucide-react"
+import { useSupabase } from "@/components/providers"
 import { generateSequence } from "../actions"
 import { toast } from "@/components/ui/use-toast"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import Link from "next/link"
 
 const formSchema = z.object({
   duration: z.string().min(1, {
@@ -33,8 +35,29 @@ const formSchema = z.object({
 
 export function SequenceGenerator() {
   const router = useRouter()
-  const supabase = createClientSupabaseClient()
+  const { supabase } = useSupabase()
   const [isGenerating, setIsGenerating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      setIsCheckingAuth(true)
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (session?.user?.id) {
+        setUserId(session.user.id)
+      } else {
+        // If not authenticated, still allow using the app with a default ID
+        setUserId("00000000-0000-0000-0000-000000000000")
+      }
+      
+      setIsCheckingAuth(false)
+    }
+    
+    checkAuth()
+  }, [supabase])
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -50,21 +73,14 @@ export function SequenceGenerator() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
       setIsGenerating(true)
+      setError(null)
 
-      // Check if user is authenticated
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-
-      if (!session) {
-        // Redirect to login if not authenticated
-        router.push("/login?redirect=/generate")
-        return
-      }
-
+      // Use the actual user ID if available, otherwise use the default
+      const currentUserId = userId || "00000000-0000-0000-0000-000000000000"
+      
       // Generate sequence using server action
       const result = await generateSequence({
-        userId: session.user.id,
+        userId: currentUserId,
         duration: Number.parseInt(values.duration),
         difficulty: values.difficulty,
         style: values.style,
@@ -73,6 +89,7 @@ export function SequenceGenerator() {
       })
 
       if (result.error) {
+        setError(result.error)
         toast({
           title: "Error",
           description: result.error,
@@ -82,12 +99,23 @@ export function SequenceGenerator() {
       }
 
       // Redirect to the newly created sequence
-      router.push(`/flows/${result.sequence.id}`)
-    } catch (error) {
+      if (result.sequence && result.sequence.id) {
+        router.push(`/flows/${result.sequence.id}`)
+      } else {
+        setError("Failed to create sequence - no sequence ID returned.")
+        toast({
+          title: "Error",
+          description: "Failed to create sequence - no sequence ID returned.",
+          variant: "destructive",
+        })
+      }
+    } catch (error: any) {
       console.error("Error generating sequence:", error)
+      const errorMessage = error?.message || "Failed to generate sequence. Please try again."
+      setError(errorMessage)
       toast({
         title: "Error",
-        description: "Failed to generate sequence. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
@@ -98,6 +126,41 @@ export function SequenceGenerator() {
   return (
     <Card className="max-w-2xl mx-auto">
       <CardContent className="pt-6">
+        {isCheckingAuth ? (
+          <div className="flex justify-center items-center p-4">
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            <span>Checking authentication...</span>
+          </div>
+        ) : userId && userId !== "00000000-0000-0000-0000-000000000000" ? (
+          <Alert className="mb-6 bg-green-50 border-green-200">
+            <Info className="h-4 w-4 text-green-500" />
+            <AlertTitle className="text-green-700">Authenticated</AlertTitle>
+            <AlertDescription className="text-green-600">
+              You are creating sequences as an authenticated user. Your sequences will be saved to your account.
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <Alert className="mb-6 bg-blue-50 border-blue-200">
+            <Info className="h-4 w-4 text-blue-500" />
+            <AlertTitle className="text-blue-700">Guest Mode</AlertTitle>
+            <AlertDescription className="text-blue-600">
+              You are not signed in. Sequences will be created under a shared account.{" "}
+              <Button variant="link" className="h-auto p-0" asChild>
+                <Link href="/login">Sign in</Link>
+              </Button>{" "}
+              to save sequences to your account.
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        {error && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+      
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <FormField

@@ -2,6 +2,7 @@ import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 import type { PoseCategory } from "@/types/pose"
 
+// Client-safe utility functions
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }

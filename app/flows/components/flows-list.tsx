@@ -8,8 +8,9 @@ import { Badge } from "@/components/ui/badge"
 import { Clock, Edit2, Trash2, Download } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { formatCategory } from "@/lib/utils"
-import { createClientSupabaseClient } from "@/lib/supabase"
 import { toast } from "@/components/ui/use-toast"
+import { useSupabase } from "@/components/providers"
+import { useRouter } from "next/navigation"
 
 interface SequencePose {
   id: string
@@ -41,8 +42,11 @@ interface FlowsListProps {
 }
 
 export function FlowsList({ sequences }: FlowsListProps) {
-  const [items, setItems] = useState(sequences)
-  const supabase = createClientSupabaseClient()
+  const router = useRouter()
+  const [loading, setLoading] = useState(true)
+  const [flows, setFlows] = useState<Sequence[]>(sequences)
+  const [error, setError] = useState<string | null>(null)
+  const { supabase } = useSupabase()
 
   const handleDelete = async (id: string) => {
     try {
@@ -50,7 +54,7 @@ export function FlowsList({ sequences }: FlowsListProps) {
 
       if (error) throw error
 
-      setItems(items.filter((item) => item.id !== id))
+      setFlows(flows.filter((item) => item.id !== id))
       toast({
         title: "Success",
         description: "Sequence deleted successfully",
@@ -97,7 +101,7 @@ export function FlowsList({ sequences }: FlowsListProps) {
     })
   }
 
-  if (items.length === 0) {
+  if (flows.length === 0) {
     return (
       <div className="text-center py-12">
         <h3 className="text-xl font-serif font-normal mb-4">You don't have any saved flows yet</h3>
@@ -111,7 +115,7 @@ export function FlowsList({ sequences }: FlowsListProps) {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {items.map((sequence) => (
+      {flows.map((sequence) => (
         <Card key={sequence.id} className="flex flex-col">
           <CardContent className="pt-6 flex-grow">
             <div className="flex justify-between items-start mb-4">

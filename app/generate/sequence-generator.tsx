@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -10,9 +9,10 @@ import { Textarea } from "@/components/ui/textarea"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
-import { Loader2, Sparkles } from "lucide-react"
-import { useSupabase } from "@/components/providers"
-import { generateSequence } from "@/app/generate/actions"
+import { Loader2, Sparkles, Info } from "lucide-react"
+import { useGenerateSequence } from "@/hooks/use-generate-sequence"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { AlertCircle } from "lucide-react"
 
 const formSchema = z.object({
   duration: z.string().min(1, {
@@ -31,9 +31,7 @@ const formSchema = z.object({
 })
 
 export function SequenceGenerator() {
-  const router = useRouter()
-  const { supabase } = useSupabase()
-  const [isGenerating, setIsGenerating] = useState(false)
+  const { generateSequence, isGenerating, error } = useGenerateSequence()
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -47,42 +45,35 @@ export function SequenceGenerator() {
   })
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    try {
-      setIsGenerating(true)
-
-      // Check if user is authenticated
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-
-      if (!session) {
-        // Redirect to login if not authenticated
-        router.push("/login?redirect=/generate")
-        return
-      }
-
-      // Generate sequence using server action
-      const sequence = await generateSequence({
-        userId: session.user.id,
-        duration: Number.parseInt(values.duration),
-        difficulty: values.difficulty,
-        style: values.style,
-        focusArea: values.focus,
-        additionalNotes: values.additionalNotes || "",
-      })
-
-      // Redirect to the newly created sequence
-      router.push(`/flows/${sequence.id}`)
-    } catch (error) {
-      console.error("Error generating sequence:", error)
-    } finally {
-      setIsGenerating(false)
-    }
+    await generateSequence({
+      duration: Number.parseInt(values.duration),
+      difficulty: values.difficulty,
+      style: values.style,
+      focusArea: values.focus,
+      additionalNotes: values.additionalNotes || "",
+    })
   }
 
   return (
     <Card className="max-w-2xl mx-auto">
       <CardContent className="pt-6">
+        {/* Notification about bypassed authentication */}
+        <Alert className="mb-6 bg-blue-50 border-blue-200">
+          <Info className="h-4 w-4 text-blue-500" />
+          <AlertTitle className="text-blue-700">Development Mode</AlertTitle>
+          <AlertDescription className="text-blue-600">
+            Authentication is temporarily bypassed for testing. All sequences will be created under a shared account.
+          </AlertDescription>
+        </Alert>
+        
+        {error && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <FormField

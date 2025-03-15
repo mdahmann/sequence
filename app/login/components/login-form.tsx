@@ -9,23 +9,24 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Loader2, Mail } from "lucide-react"
-import { createClientSupabaseClient } from "@/lib/supabase"
 import { toast } from "@/components/ui/use-toast"
+import { useSupabase } from "@/components/providers"
 
 export function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirect = searchParams.get("redirect") || "/"
 
-  const supabase = createClientSupabaseClient()
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const { supabase } = useSupabase()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
+    setLoading(true)
 
     try {
       const { error } = await supabase.auth.signInWithPassword({
@@ -44,7 +45,7 @@ export function LoginForm() {
         variant: "destructive",
       })
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
@@ -58,7 +59,7 @@ export function LoginForm() {
       return
     }
 
-    setIsLoading(true)
+    setLoading(true)
 
     try {
       const { error } = await supabase.auth.signInWithOtp({
@@ -78,7 +79,7 @@ export function LoginForm() {
         variant: "destructive",
       })
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
@@ -116,8 +117,8 @@ export function LoginForm() {
             />
           </div>
 
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? (
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Signing in...
@@ -137,7 +138,7 @@ export function LoginForm() {
           </div>
         </div>
 
-        <Button type="button" variant="outline" className="w-full" onClick={handleMagicLinkLogin} disabled={isLoading}>
+        <Button type="button" variant="outline" className="w-full" onClick={handleMagicLinkLogin} disabled={loading}>
           <Mail className="mr-2 h-4 w-4" />
           Sign in with Magic Link
         </Button>

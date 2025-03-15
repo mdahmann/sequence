@@ -2,12 +2,15 @@
 
 import type React from "react"
 
-import { createContext, useContext, useState } from "react"
+import { createContext, useContext } from "react"
 import { createClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/supabase"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+// Create a single instance of the Supabase client outside of any components
+const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey)
 
 type SupabaseContext = {
   supabase: ReturnType<typeof createClient<Database>>
@@ -16,8 +19,7 @@ type SupabaseContext = {
 const Context = createContext<SupabaseContext | undefined>(undefined)
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  const [supabase] = useState(() => createClient<Database>(supabaseUrl, supabaseAnonKey))
-
+  // Use the existing client instead of creating a new one
   return <Context.Provider value={{ supabase }}>{children}</Context.Provider>
 }
 

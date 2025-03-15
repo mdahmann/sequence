@@ -1,3 +1,4 @@
+import { Suspense } from "react"
 import { LoginForm } from "./components/login-form"
 import { PageContainer } from "@/components/page-container"
 
@@ -10,7 +11,9 @@ export default function LoginPage() {
           Sign in to your account to save and manage your yoga sequences.
         </p>
 
-        <LoginForm />
+        <Suspense fallback={<div className="text-center">Loading...</div>}>
+          <LoginForm />
+        </Suspense>
       </PageContainer>
     </div>
   )
