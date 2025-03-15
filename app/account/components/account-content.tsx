@@ -9,15 +9,27 @@ import { Badge } from "@/components/ui/badge"
 import { Loader2, LogOut } from "lucide-react"
 import { useSupabase } from "@/components/providers"
 import { toast } from "@/components/ui/use-toast"
+import type { User } from '@supabase/supabase-js'
 
-export function AccountContent() {
+interface AccountContentProps {
+  initialUser?: User;
+}
+
+export function AccountContent({ initialUser }: AccountContentProps) {
   const router = useRouter()
   const { supabase } = useSupabase()
-  const [user, setUser] = useState<any>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [user, setUser] = useState<User | null>(initialUser || null)
+  const [isLoading, setIsLoading] = useState(!initialUser)
   const [flowCount, setFlowCount] = useState(0)
 
   useEffect(() => {
+    // If we already have a user from server-side props, just fetch the flow count
+    if (initialUser) {
+      getFlowCount(initialUser.id)
+      return
+    }
+    
+    // Otherwise fetch the user and flow count
     const getUser = async () => {
       setIsLoading(true)
       
@@ -33,16 +45,7 @@ export function AccountContent() {
         setUser(session.user)
         
         // Get count of user's flows
-        if (session.user.id) {
-          const { count, error } = await supabase
-            .from("sequences")
-            .select("*", { count: 'exact' })
-            .eq("user_id", session.user.id)
-          
-          if (!error) {
-            setFlowCount(count || 0)
-          }
-        }
+        await getFlowCount(session.user.id)
       } catch (error) {
         console.error("Error fetching user data:", error)
         toast({
@@ -56,15 +59,30 @@ export function AccountContent() {
     }
     
     getUser()
-  }, [supabase, router])
+  }, [supabase, router, initialUser])
+  
+  const getFlowCount = async (userId: string) => {
+    try {
+      const { count, error } = await supabase
+        .from("sequences")
+        .select("*", { count: 'exact' })
+        .eq("user_id", userId)
+      
+      if (!error) {
+        setFlowCount(count || 0)
+      }
+    } catch (error) {
+      console.error("Error fetching flow count:", error)
+    }
+  }
   
   const handleSignOut = async () => {
     setIsLoading(true)
     
     try {
       await supabase.auth.signOut()
-      router.push('/login')
-      router.refresh()
+      // Force a full page reload to clear all auth state
+      window.location.href = '/login'
     } catch (error) {
       console.error("Error signing out:", error)
       toast({
@@ -109,7 +127,7 @@ export function AccountContent() {
         <CardContent className="space-y-4">
           <div className="flex items-center space-x-4">
             <Avatar className="h-16 w-16">
-              <AvatarFallback className="text-lg">{getInitials(user.email)}</AvatarFallback>
+              <AvatarFallback className="text-lg">{getInitials(user.email || '')}</AvatarFallback>
             </Avatar>
             <div>
               <div className="text-xl font-medium">{user.email}</div>

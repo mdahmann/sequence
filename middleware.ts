@@ -24,13 +24,28 @@ export async function middleware(request: NextRequest) {
   }
   
   try {
+    // Create a client with the same behavior as the browser client
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         auth: {
-          persistSession: false,
+          persistSession: true,
+          autoRefreshToken: true,
           flowType: 'pkce',
+          detectSessionInUrl: true,
+        },
+        global: {
+          // Get cookies from the request
+          fetch: (url, options) => {
+            // Add cookies from the request to the fetch call
+            options = options || {};
+            options.headers = {
+              ...options.headers,
+              Cookie: request.headers.get('cookie') || '',
+            };
+            return fetch(url, options);
+          },
         }
       }
     )
@@ -38,6 +53,8 @@ export async function middleware(request: NextRequest) {
     // Get session from cookies
     const { data: { session } } = await supabase.auth.getSession()
     const isAuthenticated = !!session
+    
+    console.log('Middleware checking auth for', pathname, 'isAuthenticated:', isAuthenticated, 'user:', session?.user?.email)
     
     // Check if the path is in the protected routes
     const isProtectedRoute = protectedRoutes.some(route => 
@@ -49,6 +66,7 @@ export async function middleware(request: NextRequest) {
     
     // If the route is protected and the user is not authenticated, redirect to login
     if (isProtectedRoute && !isAuthenticated) {
+      console.log('Redirecting to login from protected route:', pathname)
       const redirectUrl = new URL('/login', request.url)
       redirectUrl.searchParams.set('redirect', pathname)
       return NextResponse.redirect(redirectUrl)
@@ -56,11 +74,13 @@ export async function middleware(request: NextRequest) {
     
     // If the user is authenticated and tries to access login/signup, redirect to account
     if (isAuthRoute && isAuthenticated) {
+      console.log('Redirecting to account from auth route:', pathname)
       return NextResponse.redirect(new URL('/account', request.url))
     }
   } catch (error) {
     console.error('Middleware error:', error)
     // If there's an error in authentication, still allow the user to continue
+    // For protected routes, we'll let the page handle the redirect if needed
   }
   
   return NextResponse.next()
