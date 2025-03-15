@@ -1,21 +1,15 @@
 import { createClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/supabase"
-import { cookies } from "next/headers"
 
 export function createServerSupabaseClient() {
-  // Create a Supabase client with the server runtime
-  const cookieStore = cookies()
-  
   return createClient<Database>(
     process.env.SUPABASE_URL!, 
     process.env.SUPABASE_ANON_KEY!,
     {
-      // Pass cookies to the Supabase client to read the session
-      global: {
-        headers: {
-          cookie: cookieStore.toString(),
-        },
-      },
+      auth: {
+        persistSession: false, // Don't persist the session in the browser
+        autoRefreshToken: false,
+      }
     }
   )
 }

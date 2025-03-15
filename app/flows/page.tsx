@@ -2,6 +2,7 @@ import { createServerSupabaseClient } from "@/lib/supabase"
 import { redirect } from "next/navigation"
 import { FlowsList } from "./components/flows-list"
 import { PageContainer } from "@/components/page-container"
+import { cookies } from "next/headers"
 
 export default async function FlowsPage() {
   const supabase = createServerSupabaseClient()
@@ -10,6 +11,8 @@ export default async function FlowsPage() {
   const {
     data: { session },
   } = await supabase.auth.getSession()
+
+  console.log("Flows page - Auth check:", session ? "Authenticated" : "Not authenticated")
 
   if (!session) {
     // Redirect to login if not authenticated

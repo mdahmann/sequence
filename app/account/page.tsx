@@ -12,6 +12,8 @@ export default async function AccountPage() {
     data: { session },
   } = await supabase.auth.getSession()
 
+  console.log("Account page - Auth check:", session ? "Authenticated" : "Not authenticated")
+
   if (!session) {
     // Redirect to login if not authenticated
     redirect("/login?redirect=/account")
