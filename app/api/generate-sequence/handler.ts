@@ -154,13 +154,14 @@ export async function generateSequence({
       const { data: sequence, error: sequenceError } = await supabase
         .from("sequences")
         .insert({
-          name: parsedResponse.name,
+          title: parsedResponse.name,
           description: parsedResponse.description,
-          duration_minutes: duration,
-          difficulty: difficulty,
+          duration: duration,
+          difficulty_level: difficulty,
           style: style,
           focus_area: focusArea,
           user_id: userId,
+          is_ai_generated: true,
         })
         .select()
         .single()
