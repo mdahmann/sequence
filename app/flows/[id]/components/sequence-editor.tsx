@@ -8,12 +8,13 @@ import { restrictToVerticalAxis, restrictToWindowEdges } from "@dnd-kit/modifier
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { SortablePoseItem } from "./sortable-pose-item"
-import { Download, Save, Plus } from "lucide-react"
+import { Download, Save, Plus, Edit, X, ChevronRight, ChevronLeft } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import { formatCategory } from "@/lib/utils"
 import { useSupabase } from "@/components/providers"
 import { Input } from "@/components/ui/input"
 import { PoseSelectionModal } from "./pose-selection-modal"
+import { PoseSidebar } from "./pose-sidebar"
 
 interface Pose {
   id: string
@@ -62,10 +63,12 @@ export function SequenceEditor({ sequence, isOwner = true }: SequenceEditorProps
   const router = useRouter()
   const { supabase } = useSupabase()
   const [sequenceTitle, setSequenceTitle] = useState(sequence.title)
+  const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [flowBlocks, setFlowBlocks] = useState<FlowBlock[]>([])
   const [isPoseModalOpen, setIsPoseModalOpen] = useState(false)
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
 
   // Set up DnD sensors
   const sensors = useSensors(
@@ -376,118 +379,204 @@ export function SequenceEditor({ sequence, isOwner = true }: SequenceEditorProps
     }
   }
 
+  const handleTitleEdit = () => {
+    if (!showEditControls) return;
+    setIsEditingTitle(true);
+  };
+
+  const handleTitleSave = () => {
+    setIsEditingTitle(false);
+  };
+
+  const handleDragOver = (e: React.DragEvent, blockId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  };
+
+  const handleDrop = async (e: React.DragEvent, blockId: string) => {
+    e.preventDefault();
+    
+    try {
+      const poseData = e.dataTransfer.getData("pose");
+      if (!poseData) return;
+      
+      const pose = JSON.parse(poseData) as Pose;
+      
+      // Set the active block and add the pose
+      setActiveBlockId(blockId);
+      await handlePoseSelect(pose);
+      
+    } catch (error) {
+      console.error("Error handling drop:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add pose to sequence",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col space-y-4">
-        <div className="flex items-center justify-between">
-          <Button variant="ghost" onClick={() => router.push('/flows')} className="px-0">
-            ← Back
-          </Button>
-          
-          {showEditControls && (
-            <div className="flex space-x-2">
-              <Button onClick={handleSave} disabled={isSaving} size="sm">
-                {isSaving ? "Saving..." : "Save"}
-                <Save className="ml-2 h-4 w-4" />
-              </Button>
-              <Button onClick={handleExport} variant="outline" size="sm">
-                Export
-                <Download className="ml-2 h-4 w-4" />
-              </Button>
-            </div>
-          )}
-        </div>
-        
-        <div className="mb-4">
-          <div className="flex items-center mb-2">
-            <label className="text-sm font-medium mr-2">Sequence Name</label>
-            {showEditControls ? (
-              <Input 
-                value={sequenceTitle} 
-                onChange={(e) => setSequenceTitle(e.target.value)}
-                className="h-10 text-lg font-medium"
-              />
-            ) : (
-              <h2 className="text-lg font-medium">{sequenceTitle}</h2>
+    <div className="flex">
+      <div className={`flex-1 space-y-8 pr-${isSidebarOpen ? '4' : '0'} transition-all duration-300`}>
+        <div className="flex flex-col space-y-4">
+          <div className="flex items-center justify-between">
+            <Button variant="ghost" onClick={() => router.push('/flows')} className="px-0">
+              ← Back
+            </Button>
+            
+            {showEditControls && (
+              <div className="flex space-x-2">
+                <Button onClick={handleSave} disabled={isSaving} size="sm">
+                  {isSaving ? "Saving..." : "Save"}
+                  <Save className="ml-2 h-4 w-4" />
+                </Button>
+                <Button onClick={handleExport} variant="outline" size="sm">
+                  Export
+                  <Download className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
             )}
           </div>
           
-          <div className="flex flex-wrap gap-2 mt-2">
-            <Badge variant="outline">{formatCategory(sequence.difficulty_level)}</Badge>
-            <Badge variant="outline">{formatCategory(sequence.style)}</Badge>
-            <Badge variant="outline">{formatCategory(sequence.focus_area)}</Badge>
-            {sequence.duration && <Badge variant="outline">{sequence.duration} min</Badge>}
+          <div className="mb-4">
+            <div className="flex items-center mb-2">
+              <label className="text-sm font-medium mr-2">Sequence Name</label>
+              {showEditControls ? (
+                isEditingTitle ? (
+                  <div className="flex items-center flex-1">
+                    <Input 
+                      value={sequenceTitle} 
+                      onChange={(e) => setSequenceTitle(e.target.value)}
+                      className="h-10 text-lg font-medium"
+                      autoFocus
+                    />
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={handleTitleSave}
+                      className="ml-2"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center cursor-pointer" onClick={handleTitleEdit}>
+                    <h2 className="text-lg font-medium">{sequenceTitle}</h2>
+                    <Button variant="ghost" size="sm" className="ml-1 h-6 w-6 p-0">
+                      <Edit className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                )
+              ) : (
+                <h2 className="text-lg font-medium">{sequenceTitle}</h2>
+              )}
+            </div>
+            
+            <div className="flex flex-wrap gap-2 mt-2">
+              <Badge variant="outline">{formatCategory(sequence.difficulty_level)}</Badge>
+              <Badge variant="outline">{formatCategory(sequence.style)}</Badge>
+              <Badge variant="outline">{formatCategory(sequence.focus_area)}</Badge>
+              {sequence.duration && <Badge variant="outline">{sequence.duration} min</Badge>}
+            </div>
+            
+            {sequence.description && (
+              <p className="text-muted-foreground mt-2">{sequence.description}</p>
+            )}
           </div>
-          
-          {sequence.description && (
-            <p className="text-muted-foreground mt-2">{sequence.description}</p>
-          )}
         </div>
+
+        {flowBlocks.map((block, blockIndex) => (
+          <div key={block.id} className="mb-8">
+            <div className="flex items-center mb-2">
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary mr-2">
+                {blockIndex + 1}
+              </div>
+              <h3 className="text-xl font-medium">{block.title}</h3>
+            </div>
+            
+            <p className="text-muted-foreground mb-4 ml-10">{block.description}</p>
+            
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={(event) => handleDragEnd(event, block.id)}
+              modifiers={[restrictToVerticalAxis, restrictToWindowEdges]}
+            >
+              <SortableContext 
+                items={block.poses.map(pose => pose.id)} 
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-4 ml-10">
+                  {block.poses.map((pose) => (
+                    <SortablePoseItem
+                      key={pose.id}
+                      id={pose.id}
+                      pose={pose.poses}
+                      cues={pose.cues || ""}
+                      side={pose.side || ""}
+                      duration={pose.duration || 30}
+                      onCueChange={(cues) => handleCueChange(pose.id, cues)}
+                      onSideChange={(side) => handleSideChange(pose.id, side)}
+                      onDurationChange={(duration) => handleDurationChange(pose.id, duration)}
+                      onDelete={handleDeletePose}
+                      isEditable={showEditControls}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+            
+            {showEditControls && (
+              <div 
+                className="mt-4 ml-10"
+                onDragOver={(e) => handleDragOver(e, block.id)}
+                onDrop={(e) => handleDrop(e, block.id)}
+              >
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full border-dashed"
+                  onClick={() => handleAddPose(block.id)}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Drag poses here to add to this phase
+                </Button>
+              </div>
+            )}
+          </div>
+        ))}
+
+        <PoseSelectionModal
+          isOpen={isPoseModalOpen}
+          onClose={() => setIsPoseModalOpen(false)}
+          onPoseSelect={handlePoseSelect}
+          blockId={activeBlockId || ""}
+        />
       </div>
 
-      {flowBlocks.map((block, blockIndex) => (
-        <div key={block.id} className="mb-8">
-          <div className="flex items-center mb-2">
-            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary mr-2">
-              {blockIndex + 1}
-            </div>
-            <h3 className="text-xl font-medium">{block.title}</h3>
+      {/* Right sidebar for pose library */}
+      <div 
+        className={`fixed top-0 right-0 h-full bg-background border-l border-border transition-all duration-300 z-10 ${
+          isSidebarOpen ? 'w-80' : 'w-10'
+        } pt-16`}
+      >
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="absolute top-20 -left-4 h-8 w-8 rounded-full border bg-background shadow-sm"
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+        >
+          {isSidebarOpen ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+        </Button>
+        
+        {isSidebarOpen && (
+          <div className="p-4 h-full overflow-y-auto">
+            <h3 className="font-medium mb-4">Pose Library</h3>
+            <PoseSidebar onPoseSelect={handlePoseSelect} />
           </div>
-          
-          <p className="text-muted-foreground mb-4 ml-10">{block.description}</p>
-          
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={(event) => handleDragEnd(event, block.id)}
-            modifiers={[restrictToVerticalAxis, restrictToWindowEdges]}
-          >
-            <SortableContext 
-              items={block.poses.map(pose => pose.id)} 
-              strategy={verticalListSortingStrategy}
-            >
-              <div className="space-y-4 ml-10">
-                {block.poses.map((pose) => (
-                  <SortablePoseItem
-                    key={pose.id}
-                    id={pose.id}
-                    pose={pose.poses}
-                    cues={pose.cues || ""}
-                    side={pose.side || ""}
-                    duration={pose.duration || 30}
-                    onCueChange={(cues) => handleCueChange(pose.id, cues)}
-                    onSideChange={(side) => handleSideChange(pose.id, side)}
-                    onDurationChange={(duration) => handleDurationChange(pose.id, duration)}
-                    onDelete={handleDeletePose}
-                    isEditable={showEditControls}
-                  />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
-          
-          {showEditControls && (
-            <div className="mt-4 ml-10">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="w-full border-dashed"
-                onClick={() => handleAddPose(block.id)}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Drag poses here to add to this phase
-              </Button>
-            </div>
-          )}
-        </div>
-      ))}
-
-      <PoseSelectionModal
-        isOpen={isPoseModalOpen}
-        onClose={() => setIsPoseModalOpen(false)}
-        onPoseSelect={handlePoseSelect}
-        blockId={activeBlockId || ""}
-      />
+        )}
+      </div>
     </div>
   );
 }
