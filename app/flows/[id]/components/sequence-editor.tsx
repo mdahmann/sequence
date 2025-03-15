@@ -43,6 +43,7 @@ interface Sequence {
   focus_area: string | null
   is_ai_generated: boolean | null
   created_at: string
+  user_id: string
   sequence_poses: SequencePose[]
 }
 
@@ -66,11 +67,28 @@ export function SequenceEditor({ sequence, isOwner = true }: SequenceEditorProps
   const [flowBlocks, setFlowBlocks] = useState<FlowBlock[]>([])
   const [isPoseModalOpen, setIsPoseModalOpen] = useState(false)
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null)
+  const [clientSideIsOwner, setClientSideIsOwner] = useState(isOwner)
 
-  // Add console logs for debugging
-  console.log("SequenceEditor rendering with sequence:", sequence.id)
-  console.log("isOwner:", isOwner)
-  console.log("sequence_poses:", sequence.sequence_poses?.length || 0)
+  // Check authentication on the client side as well
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const userIsOwner = session?.user?.id === sequence.user_id
+        console.log("Client-side auth check:", {
+          userLoggedIn: !!session?.user,
+          userIdInSession: session?.user?.id,
+          sequenceUserId: sequence.user_id,
+          userIsOwner
+        })
+        setClientSideIsOwner(userIsOwner)
+      } catch (error) {
+        console.error("Error checking auth:", error)
+      }
+    }
+    
+    checkAuth()
+  }, [supabase, sequence.user_id])
 
   // Set up DnD sensors
   const sensors = useSensors(
@@ -82,40 +100,13 @@ export function SequenceEditor({ sequence, isOwner = true }: SequenceEditorProps
 
   // Group poses into flow blocks based on position
   useEffect(() => {
-    console.log("useEffect for grouping poses running")
-    
-    // Ensure sequence_poses is an array
-    if (!sequence.sequence_poses || !Array.isArray(sequence.sequence_poses)) {
-      console.error("sequence_poses is not an array:", sequence.sequence_poses)
-      sequence.sequence_poses = []
-    }
-    
     // If no poses, create a default block
-    if (sequence.sequence_poses.length === 0) {
-      console.log("No poses found, creating default blocks")
+    if (!sequence.sequence_poses || sequence.sequence_poses.length === 0) {
       setFlowBlocks([
         {
           id: "block-1",
           title: "Centering and Breath Awareness",
           description: "Begin with centering the mind and body, focusing on breath awareness.",
-          poses: []
-        },
-        {
-          id: "block-2",
-          title: "Gentle Movements and Joint Mobility",
-          description: "Gently awaken the body with movements that promote joint mobility.",
-          poses: []
-        },
-        {
-          id: "block-3",
-          title: "Warm-up with Sun Salutations",
-          description: "Begin to build heat with a gentle flow of Sun Salutations.",
-          poses: []
-        },
-        {
-          id: "block-4",
-          title: "Cool Down",
-          description: "Transition to cooling down with gentle stretches.",
           poses: []
         }
       ]);
@@ -151,28 +142,16 @@ export function SequenceEditor({ sequence, isOwner = true }: SequenceEditorProps
       }
     ];
 
-    try {
-      // Distribute poses among blocks
-      const sortedPoses = [...sequence.sequence_poses]
-        .filter(pose => pose && pose.poses) // Filter out invalid poses
-        .sort((a, b) => (a.position || 0) - (b.position || 0));
-      
-      console.log("Sorted poses:", sortedPoses.length)
-      
-      const posesPerBlock = Math.ceil(sortedPoses.length / blocks.length);
-      
-      sortedPoses.forEach((pose, index) => {
-        const blockIndex = Math.min(Math.floor(index / posesPerBlock), blocks.length - 1);
-        blocks[blockIndex].poses.push(pose);
-      });
+    // Distribute poses among blocks
+    const sortedPoses = [...sequence.sequence_poses].sort((a, b) => a.position - b.position);
+    const posesPerBlock = Math.ceil(sortedPoses.length / blocks.length);
+    
+    sortedPoses.forEach((pose, index) => {
+      const blockIndex = Math.min(Math.floor(index / posesPerBlock), blocks.length - 1);
+      blocks[blockIndex].poses.push(pose);
+    });
 
-      console.log("Blocks created:", blocks.map(b => `${b.title}: ${b.poses.length} poses`))
-      setFlowBlocks(blocks);
-    } catch (error) {
-      console.error("Error distributing poses:", error)
-      // If there's an error, still set the blocks but without poses
-      setFlowBlocks(blocks);
-    }
+    setFlowBlocks(blocks);
   }, [sequence.sequence_poses]);
 
   const handleDragEnd = (event: any, blockId: string) => {
@@ -327,31 +306,21 @@ export function SequenceEditor({ sequence, isOwner = true }: SequenceEditorProps
   };
 
   // Only show edit controls if the user is the owner
-  const showEditControls = isOwner;
+  const showEditControls = isOwner || clientSideIsOwner
 
   const handleAddPose = (blockId: string) => {
-    console.log("handleAddPose called with blockId:", blockId)
     setActiveBlockId(blockId)
     setIsPoseModalOpen(true)
   }
 
   const handlePoseSelect = async (pose: Pose) => {
-    console.log("handlePoseSelect called with pose:", pose.english_name)
-    if (!activeBlockId) {
-      console.error("No active block ID")
-      return
-    }
+    if (!activeBlockId) return
 
     try {
       // Find the block
       const block = flowBlocks.find(b => b.id === activeBlockId)
-      if (!block) {
-        console.error("Block not found:", activeBlockId)
-        return
-      }
+      if (!block) return
 
-      console.log("Creating new sequence pose for block:", block.title)
-      
       // Create a new sequence pose in the database
       const { data: newPose, error } = await supabase
         .from("sequence_poses")
@@ -368,13 +337,8 @@ export function SequenceEditor({ sequence, isOwner = true }: SequenceEditorProps
         .select("*, poses(*)")
         .single()
 
-      if (error) {
-        console.error("Error inserting new pose:", error)
-        throw error
-      }
+      if (error) throw error
 
-      console.log("New pose created:", newPose)
-      
       // Update the flow blocks with the new pose
       setFlowBlocks(prevBlocks => {
         return prevBlocks.map(block => {

@@ -9,7 +9,6 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Search, Plus } from "lucide-react"
 import { useSupabase } from "@/components/providers"
 import { formatCategory } from "@/lib/utils"
-import { toast } from "@/components/ui/use-toast"
 
 interface Pose {
   id: string
@@ -38,39 +37,22 @@ export function PoseSelectionModal({
   const [filteredPoses, setFilteredPoses] = useState<Pose[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  console.log("PoseSelectionModal rendered, isOpen:", isOpen)
 
   useEffect(() => {
     const fetchPoses = async () => {
-      console.log("Fetching poses...")
       setIsLoading(true)
-      setError(null)
-      
       try {
         const { data, error } = await supabase
           .from("poses")
           .select("*")
           .order("english_name")
         
-        if (error) {
-          console.error("Error fetching poses:", error)
-          setError(`Error fetching poses: ${error.message}`)
-          throw error
-        }
+        if (error) throw error
         
-        console.log(`Fetched ${data?.length || 0} poses`)
         setPoses(data || [])
         setFilteredPoses(data || [])
-      } catch (error: any) {
-        console.error("Error in fetchPoses:", error)
-        setError(error.message || "Failed to fetch poses")
-        toast({
-          title: "Error",
-          description: "Failed to fetch poses. Please try again.",
-          variant: "destructive",
-        })
+      } catch (error) {
+        console.error("Error fetching poses:", error)
       } finally {
         setIsLoading(false)
       }
@@ -98,7 +80,6 @@ export function PoseSelectionModal({
   }, [searchQuery, poses])
 
   const handlePoseSelect = (pose: Pose) => {
-    console.log("Pose selected:", pose.english_name)
     onPoseSelect(pose)
     onClose()
   }
@@ -124,10 +105,6 @@ export function PoseSelectionModal({
           {isLoading ? (
             <div className="flex justify-center items-center h-40">
               <p>Loading poses...</p>
-            </div>
-          ) : error ? (
-            <div className="flex justify-center items-center h-40 text-red-500">
-              <p>{error}</p>
             </div>
           ) : filteredPoses.length === 0 ? (
             <div className="flex justify-center items-center h-40">
