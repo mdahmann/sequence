@@ -4,6 +4,9 @@ import { SequenceEditor } from "./components/sequence-editor"
 import { PageContainer } from "@/components/page-container"
 
 export default async function FlowPage({ params }: { params: { id: string } }) {
+  // Store the ID in a variable to avoid the async params warning
+  const flowId = params.id
+  
   const supabase = createServerSupabaseClient()
 
   // Get the current user
@@ -13,7 +16,7 @@ export default async function FlowPage({ params }: { params: { id: string } }) {
 
   if (!session) {
     // Redirect to login if not authenticated
-    redirect(`/login?redirect=/flows/${params.id}`)
+    redirect(`/login?redirect=/flows/${flowId}`)
   }
 
   // Fetch the sequence with its poses
@@ -30,7 +33,7 @@ export default async function FlowPage({ params }: { params: { id: string } }) {
         poses (*)
       )
     `)
-    .eq("id", params.id)
+    .eq("id", flowId)
     .eq("user_id", session.user.id)
     .single()
 
