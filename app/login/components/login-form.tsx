@@ -28,6 +28,8 @@ export function LoginForm() {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    
+    console.log("Attempting login with email:", email)
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -36,11 +38,14 @@ export function LoginForm() {
       })
 
       if (error) {
+        console.error("Login error:", error.message)
         setError(error.message)
         throw error
       }
 
-      // If successful, refresh the page to update auth state in the navbar
+      console.log("Login successful, redirecting to:", redirect)
+      
+      // If successful, force a full page reload to update auth state everywhere
       window.location.href = redirect
     } catch (error: any) {
       console.error("Login error:", error)

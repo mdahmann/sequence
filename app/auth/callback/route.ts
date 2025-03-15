@@ -7,12 +7,20 @@ export async function GET(request: NextRequest) {
   const code = requestUrl.searchParams.get("code")
   const redirect = requestUrl.searchParams.get("redirect") || "/"
 
+  console.log("Auth callback received:", { hasCode: !!code, redirect })
+
   if (code) {
-    const cookieStore = cookies()
-    const supabase = createServerSupabaseClient()
-    await supabase.auth.exchangeCodeForSession(code)
+    try {
+      const cookieStore = cookies()
+      const supabase = createServerSupabaseClient()
+      const result = await supabase.auth.exchangeCodeForSession(code)
+      console.log("Code exchange completed successfully:", !!result.data.session)
+    } catch (error) {
+      console.error("Error exchanging code for session:", error)
+    }
   }
 
+  console.log("Redirecting to:", `${requestUrl.origin}${redirect}`)
   return NextResponse.redirect(`${requestUrl.origin}${redirect}`)
 }
 

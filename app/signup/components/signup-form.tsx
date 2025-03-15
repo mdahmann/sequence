@@ -40,6 +40,7 @@ export function SignupForm() {
     }
     
     setLoading(true)
+    console.log("Attempting signup with email:", email)
 
     try {
       const { data, error } = await supabase.auth.signUp({
@@ -51,16 +52,19 @@ export function SignupForm() {
       })
 
       if (error) {
+        console.error("Signup error:", error.message)
         setError(error.message)
         throw error
       }
 
       // Redirect on successful signup if autoconfirm is enabled
       if (data.session) {
+        console.log("Signup successful with session, redirecting to:", redirect)
         window.location.href = redirect
         return
       }
 
+      console.log("Signup successful, email confirmation required")
       setMessage("Check your email to confirm your account")
     } catch (error: any) {
       console.error("Signup error:", error)

@@ -2,9 +2,10 @@
 
 import type React from "react"
 
-import { createContext, useContext } from "react"
+import { createContext, useContext, useState, useEffect } from "react"
 import { createClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/supabase"
+import { useRouter } from "next/navigation"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -21,14 +22,50 @@ const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
 })
 
 type SupabaseContext = {
-  supabase: ReturnType<typeof createClient<Database>>
+  supabase: ReturnType<typeof createClient<Database>>;
+  isAuthenticated: boolean;
 }
 
 const Context = createContext<SupabaseContext | undefined>(undefined)
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  // Use the existing client instead of creating a new one
-  return <Context.Provider value={{ supabase }}>{children}</Context.Provider>
+  const router = useRouter()
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false)
+  
+  useEffect(() => {
+    // Check authentication status when component mounts
+    const checkAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        setIsAuthenticated(!!session)
+        
+        // Subscribe to auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+          (_event, session) => {
+            console.log("Auth state changed:", _event, session ? "Authenticated" : "Not authenticated")
+            setIsAuthenticated(!!session)
+            
+            // Refresh the page after auth state changes to ensure all components update
+            router.refresh()
+          }
+        )
+        
+        return () => {
+          subscription.unsubscribe()
+        }
+      } catch (error) {
+        console.error("Error checking auth in provider:", error)
+      }
+    }
+    
+    checkAuth()
+  }, [router])
+  
+  return (
+    <Context.Provider value={{ supabase, isAuthenticated }}>
+      {children}
+    </Context.Provider>
+  )
 }
 
 export const useSupabase = () => {

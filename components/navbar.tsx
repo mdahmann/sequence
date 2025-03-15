@@ -18,7 +18,7 @@ import { User } from "lucide-react"
 export function Navbar() {
   const pathname = usePathname()
   const router = useRouter()
-  const { supabase } = useSupabase()
+  const { supabase, isAuthenticated } = useSupabase()
   const [user, setUser] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -28,13 +28,13 @@ export function Navbar() {
       try {
         setIsLoading(true)
         const { data: { session } } = await supabase.auth.getSession()
-        console.log("Auth state:", session ? "Authenticated" : "Not authenticated")
+        console.log("Navbar auth state:", session ? "Authenticated" : "Not authenticated")
         setUser(session?.user || null)
         
         // Set up a listener for auth state changes
         const { data: { subscription } } = await supabase.auth.onAuthStateChange(
           (event, session) => {
-            console.log("Auth state changed:", event, session ? "Authenticated" : "Not authenticated")
+            console.log("Navbar auth state changed:", event, session ? "Authenticated" : "Not authenticated")
             setUser(session?.user || null)
           }
         )
@@ -43,7 +43,7 @@ export function Navbar() {
           subscription.unsubscribe()
         }
       } catch (error) {
-        console.error("Error checking auth:", error)
+        console.error("Error checking auth in navbar:", error)
       } finally {
         setIsLoading(false)
       }
@@ -55,9 +55,12 @@ export function Navbar() {
   const handleSignOut = async () => {
     try {
       setIsLoading(true)
+      // Add a console log to track sign out
+      console.log("Signing out user...")
       await supabase.auth.signOut()
       setUser(null)
       // Force page reload to clear all auth state
+      console.log("Sign out complete, redirecting...")
       window.location.href = '/'
     } catch (error) {
       console.error("Error signing out:", error)
