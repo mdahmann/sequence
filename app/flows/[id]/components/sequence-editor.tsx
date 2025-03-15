@@ -67,6 +67,11 @@ export function SequenceEditor({ sequence, isOwner = true }: SequenceEditorProps
   const [isPoseModalOpen, setIsPoseModalOpen] = useState(false)
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null)
 
+  // Add console logs for debugging
+  console.log("SequenceEditor rendering with sequence:", sequence.id)
+  console.log("isOwner:", isOwner)
+  console.log("sequence_poses:", sequence.sequence_poses?.length || 0)
+
   // Set up DnD sensors
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -286,18 +291,28 @@ export function SequenceEditor({ sequence, isOwner = true }: SequenceEditorProps
   const showEditControls = isOwner;
 
   const handleAddPose = (blockId: string) => {
+    console.log("handleAddPose called with blockId:", blockId)
     setActiveBlockId(blockId)
     setIsPoseModalOpen(true)
   }
 
   const handlePoseSelect = async (pose: Pose) => {
-    if (!activeBlockId) return
+    console.log("handlePoseSelect called with pose:", pose.english_name)
+    if (!activeBlockId) {
+      console.error("No active block ID")
+      return
+    }
 
     try {
       // Find the block
       const block = flowBlocks.find(b => b.id === activeBlockId)
-      if (!block) return
+      if (!block) {
+        console.error("Block not found:", activeBlockId)
+        return
+      }
 
+      console.log("Creating new sequence pose for block:", block.title)
+      
       // Create a new sequence pose in the database
       const { data: newPose, error } = await supabase
         .from("sequence_poses")
@@ -314,8 +329,13 @@ export function SequenceEditor({ sequence, isOwner = true }: SequenceEditorProps
         .select("*, poses(*)")
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error("Error inserting new pose:", error)
+        throw error
+      }
 
+      console.log("New pose created:", newPose)
+      
       // Update the flow blocks with the new pose
       setFlowBlocks(prevBlocks => {
         return prevBlocks.map(block => {
