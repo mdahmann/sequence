@@ -1,4 +1,10 @@
-export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
 
 export interface Database {
   public: {
@@ -92,45 +98,51 @@ export interface Database {
       sequences: {
         Row: {
           id: string
-          user_id: string
-          title: string
+          name: string
           description: string | null
-          duration: number | null
-          difficulty_level: string | null
-          style: string | null
-          focus_area: string | null
-          peak_pose: string | null
-          is_ai_generated: boolean | null
+          duration_minutes: number
+          difficulty: string
+          style: string
+          focus: string
+          phases: Json
           created_at: string
-          updated_at: string
+          updated_at: string | null
+          user_id: string | null
+          is_favorite: boolean
+          tags: string[] | null
+          notes: string | null
         }
         Insert: {
-          id?: string
-          user_id: string
-          title: string
+          id: string
+          name: string
           description?: string | null
-          duration?: number | null
-          difficulty_level?: string | null
-          style?: string | null
-          focus_area?: string | null
-          peak_pose?: string | null
-          is_ai_generated?: boolean | null
+          duration_minutes: number
+          difficulty: string
+          style: string
+          focus: string
+          phases: Json
           created_at?: string
-          updated_at?: string
+          updated_at?: string | null
+          user_id?: string | null
+          is_favorite?: boolean
+          tags?: string[] | null
+          notes?: string | null
         }
         Update: {
           id?: string
-          user_id?: string
-          title?: string
+          name?: string
           description?: string | null
-          duration?: number | null
-          difficulty_level?: string | null
-          style?: string | null
-          focus_area?: string | null
-          peak_pose?: string | null
-          is_ai_generated?: boolean | null
+          duration_minutes?: number
+          difficulty?: string
+          style?: string
+          focus?: string
+          phases?: Json
           created_at?: string
-          updated_at?: string
+          updated_at?: string | null
+          user_id?: string | null
+          is_favorite?: boolean
+          tags?: string[] | null
+          notes?: string | null
         }
       }
       sequence_poses: {
@@ -168,6 +180,15 @@ export interface Database {
           updated_at?: string
         }
       }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
     }
   }
 }
