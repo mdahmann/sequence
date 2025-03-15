@@ -84,7 +84,7 @@ export function LoginForm() {
   }
 
   return (
-    <Card className="w-full">
+    <Card className="w-full max-w-[500px] mx-auto">
       <CardContent className="pt-8 px-8">
         {message && <div className="bg-primary/10 text-primary p-3 rounded-md mb-4">{message}</div>}
 
