@@ -40,20 +40,33 @@ export function SequenceGenerator() {
   const [error, setError] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   useEffect(() => {
     const checkAuth = async () => {
       setIsCheckingAuth(true)
-      const { data: { session } } = await supabase.auth.getSession()
+      console.log("SequenceGenerator: Checking auth state")
       
-      if (session?.user?.id) {
-        setUserId(session.user.id)
-      } else {
-        // If not authenticated, still allow using the app with a default ID
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        if (session?.user?.id) {
+          console.log("SequenceGenerator: User authenticated:", session.user.email)
+          setUserId(session.user.id)
+          setIsAuthenticated(true)
+        } else {
+          console.log("SequenceGenerator: No authenticated user found")
+          // If not authenticated, still allow using the app with a default ID
+          setUserId("00000000-0000-0000-0000-000000000000")
+          setIsAuthenticated(false)
+        }
+      } catch (error) {
+        console.error("SequenceGenerator: Error checking auth:", error)
         setUserId("00000000-0000-0000-0000-000000000000")
+        setIsAuthenticated(false)
+      } finally {
+        setIsCheckingAuth(false)
       }
-      
-      setIsCheckingAuth(false)
     }
     
     checkAuth()
@@ -74,9 +87,13 @@ export function SequenceGenerator() {
     try {
       setIsGenerating(true)
       setError(null)
+      
+      console.log("SequenceGenerator: Generating sequence with values:", values)
 
       // Use the actual user ID if available, otherwise use the default
       const currentUserId = userId || "00000000-0000-0000-0000-000000000000"
+      
+      console.log("SequenceGenerator: Using user ID:", currentUserId)
       
       // Generate sequence using server action
       const result = await generateSequence({
@@ -89,6 +106,7 @@ export function SequenceGenerator() {
       })
 
       if (result.error) {
+        console.error("SequenceGenerator: Error generating sequence:", result.error)
         setError(result.error)
         toast({
           title: "Error",
@@ -96,6 +114,16 @@ export function SequenceGenerator() {
           variant: "destructive",
         })
         return
+      }
+
+      console.log("SequenceGenerator: Sequence generated successfully:", result.sequence?.id)
+      
+      // If user is not authenticated, show a message encouraging them to sign up
+      if (!isAuthenticated) {
+        toast({
+          title: "Sequence generated!",
+          description: "Sign up to save this sequence and access it later.",
+        })
       }
 
       // Redirect to the newly created sequence
@@ -109,18 +137,40 @@ export function SequenceGenerator() {
           variant: "destructive",
         })
       }
-    } catch (error: any) {
-      console.error("Error generating sequence:", error)
-      const errorMessage = error?.message || "Failed to generate sequence. Please try again."
-      setError(errorMessage)
+    } catch (err: any) {
+      console.error("SequenceGenerator: Unhandled error:", err)
+      setError(err.message || "An unexpected error occurred")
       toast({
         title: "Error",
-        description: errorMessage,
+        description: err.message || "An unexpected error occurred",
         variant: "destructive",
       })
     } finally {
       setIsGenerating(false)
     }
+  }
+
+  // Add a login prompt for unauthenticated users
+  const renderAuthPrompt = () => {
+    if (isAuthenticated) return null
+    
+    return (
+      <Alert className="mb-6">
+        <Info className="h-4 w-4" />
+        <AlertTitle>Not signed in</AlertTitle>
+        <AlertDescription>
+          You can generate sequences without an account, but they won't be saved.{" "}
+          <Link href="/signup" className="font-medium underline underline-offset-4">
+            Sign up
+          </Link>{" "}
+          or{" "}
+          <Link href="/login" className="font-medium underline underline-offset-4">
+            log in
+          </Link>{" "}
+          to save your sequences.
+        </AlertDescription>
+      </Alert>
+    )
   }
 
   return (
@@ -131,28 +181,8 @@ export function SequenceGenerator() {
             <Loader2 className="h-4 w-4 animate-spin mr-2" />
             <span>Checking authentication...</span>
           </div>
-        ) : userId && userId !== "00000000-0000-0000-0000-000000000000" ? (
-          <Alert className="mb-6 bg-green-50 border-green-200">
-            <Info className="h-4 w-4 text-green-500" />
-            <AlertTitle className="text-green-700">Authenticated</AlertTitle>
-            <AlertDescription className="text-green-600">
-              You are creating sequences as an authenticated user. Your sequences will be saved to your account.
-            </AlertDescription>
-          </Alert>
-        ) : (
-          <Alert className="mb-6 bg-blue-50 border-blue-200">
-            <Info className="h-4 w-4 text-blue-500" />
-            <AlertTitle className="text-blue-700">Guest Mode</AlertTitle>
-            <AlertDescription className="text-blue-600">
-              You are not signed in. Sequences will be created under a shared account.{" "}
-              <Button variant="link" className="h-auto p-0" asChild>
-                <Link href="/login">Sign in</Link>
-              </Button>{" "}
-              to save sequences to your account.
-            </AlertDescription>
-          </Alert>
-        )}
-        
+        ) : renderAuthPrompt()}
+
         {error && (
           <Alert variant="destructive" className="mb-6">
             <AlertCircle className="h-4 w-4" />
@@ -160,7 +190,7 @@ export function SequenceGenerator() {
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
-      
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <FormField

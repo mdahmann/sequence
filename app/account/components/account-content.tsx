@@ -11,37 +11,30 @@ import { useSupabase } from "@/components/providers"
 import { toast } from "@/components/ui/use-toast"
 import type { User } from '@supabase/supabase-js'
 
-interface AccountContentProps {
-  initialUser?: User;
-}
-
-export function AccountContent({ initialUser }: AccountContentProps) {
+export function AccountContent() {
   const router = useRouter()
   const { supabase } = useSupabase()
-  const [user, setUser] = useState<User | null>(initialUser || null)
-  const [isLoading, setIsLoading] = useState(!initialUser)
+  const [user, setUser] = useState<User | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const [flowCount, setFlowCount] = useState(0)
 
   useEffect(() => {
-    // If we already have a user from server-side props, just fetch the flow count
-    if (initialUser) {
-      getFlowCount(initialUser.id)
-      return
-    }
-    
-    // Otherwise fetch the user and flow count
+    // Fetch the user and flow count
     const getUser = async () => {
       setIsLoading(true)
       
       try {
+        console.log("AccountContent: Checking auth state")
         // Get user session
         const { data: { session } } = await supabase.auth.getSession()
         
         if (!session || !session.user) {
-          router.push('/login')
+          console.log("AccountContent: No session found, redirecting to login")
+          router.push('/login?redirect=/account')
           return
         }
         
+        console.log("AccountContent: User authenticated:", session.user.email)
         setUser(session.user)
         
         // Get count of user's flows
@@ -59,7 +52,7 @@ export function AccountContent({ initialUser }: AccountContentProps) {
     }
     
     getUser()
-  }, [supabase, router, initialUser])
+  }, [supabase, router])
   
   const getFlowCount = async (userId: string) => {
     try {
@@ -80,6 +73,7 @@ export function AccountContent({ initialUser }: AccountContentProps) {
     setIsLoading(true)
     
     try {
+      console.log("AccountContent: Signing out")
       await supabase.auth.signOut()
       // Force a full page reload to clear all auth state
       window.location.href = '/login'

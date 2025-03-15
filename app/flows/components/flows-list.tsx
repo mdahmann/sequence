@@ -1,11 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Clock, Edit2, Trash2, Download } from "lucide-react"
+import { Clock, Edit2, Trash2, Download, Loader2 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { formatCategory } from "@/lib/utils"
 import { toast } from "@/components/ui/use-toast"
@@ -41,12 +41,71 @@ interface FlowsListProps {
   sequences: Sequence[]
 }
 
-export function FlowsList({ sequences }: FlowsListProps) {
+export function FlowsList() {
   const router = useRouter()
-  const [loading, setLoading] = useState(true)
-  const [flows, setFlows] = useState<Sequence[]>(sequences)
-  const [error, setError] = useState<string | null>(null)
   const { supabase } = useSupabase()
+  const [loading, setLoading] = useState(true)
+  const [flows, setFlows] = useState<Sequence[]>([])
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchSequences = async () => {
+      setLoading(true)
+      setError(null)
+      
+      try {
+        console.log("FlowsList: Checking auth state")
+        // Get user session
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        if (!session || !session.user) {
+          console.log("FlowsList: No session found, redirecting to login")
+          router.push('/login?redirect=/flows')
+          return
+        }
+        
+        console.log("FlowsList: User authenticated:", session.user.email)
+        
+        // Fetch user's sequences
+        const { data: sequences, error } = await supabase
+          .from("sequences")
+          .select(`
+            *,
+            sequence_poses (
+              id,
+              position,
+              poses (
+                id,
+                english_name,
+                sanskrit_name,
+                category,
+                difficulty_level
+              )
+            )
+          `)
+          .eq("user_id", session.user.id)
+          .order("created_at", { ascending: false })
+        
+        if (error) {
+          throw error
+        }
+        
+        setFlows(sequences || [])
+      } catch (error: any) {
+        console.error("Error fetching sequences:", error)
+        setError(error.message || "Failed to load sequences")
+        toast({
+          title: "Error",
+          description: "Failed to load your sequences",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    fetchSequences()
+  }, [supabase, router])
 
   const handleDelete = async (id: string) => {
     try {
@@ -99,6 +158,25 @@ export function FlowsList({ sequences }: FlowsListProps) {
       title: "Success",
       description: "Sequence exported successfully",
     })
+  }
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="ml-2">Loading your flows...</span>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <h3 className="text-xl font-serif font-normal mb-4">Error loading flows</h3>
+        <p className="text-muted-foreground mb-6">{error}</p>
+        <Button onClick={() => router.refresh()}>Try Again</Button>
+      </div>
+    )
   }
 
   if (flows.length === 0) {
