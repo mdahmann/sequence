@@ -25,20 +25,27 @@ export function Navbar() {
   useEffect(() => {
     // Check for the current session when the component mounts
     const checkSession = async () => {
-      setIsLoading(true)
-      const { data: { session } } = await supabase.auth.getSession()
-      setUser(session?.user || null)
-      setIsLoading(false)
-      
-      // Set up a listener for auth state changes
-      const { data: { subscription } } = await supabase.auth.onAuthStateChange(
-        (_event, session) => {
-          setUser(session?.user || null)
+      try {
+        setIsLoading(true)
+        const { data: { session } } = await supabase.auth.getSession()
+        console.log("Auth state:", session ? "Authenticated" : "Not authenticated")
+        setUser(session?.user || null)
+        
+        // Set up a listener for auth state changes
+        const { data: { subscription } } = await supabase.auth.onAuthStateChange(
+          (event, session) => {
+            console.log("Auth state changed:", event, session ? "Authenticated" : "Not authenticated")
+            setUser(session?.user || null)
+          }
+        )
+        
+        return () => {
+          subscription.unsubscribe()
         }
-      )
-      
-      return () => {
-        subscription.unsubscribe()
+      } catch (error) {
+        console.error("Error checking auth:", error)
+      } finally {
+        setIsLoading(false)
       }
     }
     
@@ -46,8 +53,17 @@ export function Navbar() {
   }, [supabase])
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    router.refresh()
+    try {
+      setIsLoading(true)
+      await supabase.auth.signOut()
+      setUser(null)
+      // Force page reload to clear all auth state
+      window.location.href = '/'
+    } catch (error) {
+      console.error("Error signing out:", error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const navItems = [

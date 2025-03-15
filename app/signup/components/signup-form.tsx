@@ -27,8 +27,10 @@ export function SignupForm() {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError(null)
     
     if (password !== confirmPassword) {
+      setError("Passwords do not match")
       toast({
         title: "Error",
         description: "Passwords do not match",
@@ -40,7 +42,7 @@ export function SignupForm() {
     setLoading(true)
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -48,10 +50,20 @@ export function SignupForm() {
         },
       })
 
-      if (error) throw error
+      if (error) {
+        setError(error.message)
+        throw error
+      }
+
+      // Redirect on successful signup if autoconfirm is enabled
+      if (data.session) {
+        window.location.href = redirect
+        return
+      }
 
       setMessage("Check your email to confirm your account")
     } catch (error: any) {
+      console.error("Signup error:", error)
       toast({
         title: "Error",
         description: error.message || "An error occurred during sign up",
@@ -64,6 +76,7 @@ export function SignupForm() {
 
   const handleMagicLinkSignup = async () => {
     if (!email) {
+      setError("Please enter your email address")
       toast({
         title: "Error",
         description: "Please enter your email address",
@@ -73,6 +86,7 @@ export function SignupForm() {
     }
 
     setLoading(true)
+    setError(null)
 
     try {
       const { error } = await supabase.auth.signInWithOtp({
@@ -82,10 +96,14 @@ export function SignupForm() {
         },
       })
 
-      if (error) throw error
+      if (error) {
+        setError(error.message)
+        throw error
+      }
 
       setMessage("Check your email for the login link")
     } catch (error: any) {
+      console.error("Magic link error:", error)
       toast({
         title: "Error",
         description: error.message || "An error occurred sending the magic link",
@@ -97,9 +115,10 @@ export function SignupForm() {
   }
 
   return (
-    <Card className="w-full max-w-[500px] mx-auto">
-      <CardContent className="pt-8 px-8">
+    <Card className="max-w-[500px] mx-auto">
+      <CardContent className="pt-6">
         {message && <div className="bg-primary/10 text-primary p-3 rounded-md mb-4">{message}</div>}
+        {error && <div className="bg-destructive/10 text-destructive p-3 rounded-md mb-4">{error}</div>}
 
         <form onSubmit={handleSignup} className="space-y-4">
           <div className="space-y-2">
@@ -163,7 +182,7 @@ export function SignupForm() {
         </Button>
       </CardContent>
 
-      <CardFooter className="flex flex-col space-y-4 border-t pt-6 pb-8 px-8">
+      <CardFooter className="flex flex-col space-y-4 border-t pt-6">
         <div className="text-center text-sm">
           Already have an account?{" "}
           <Button variant="link" className="p-0 h-auto" asChild>

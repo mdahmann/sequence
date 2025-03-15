@@ -27,18 +27,23 @@ export function LoginForm() {
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    setError(null)
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
-      if (error) throw error
+      if (error) {
+        setError(error.message)
+        throw error
+      }
 
-      router.push(redirect)
-      router.refresh()
+      // If successful, refresh the page to update auth state in the navbar
+      window.location.href = redirect
     } catch (error: any) {
+      console.error("Login error:", error)
       toast({
         title: "Error",
         description: error.message || "An error occurred during sign in",
@@ -60,6 +65,7 @@ export function LoginForm() {
     }
 
     setLoading(true)
+    setError(null)
 
     try {
       const { error } = await supabase.auth.signInWithOtp({
@@ -69,10 +75,14 @@ export function LoginForm() {
         },
       })
 
-      if (error) throw error
+      if (error) {
+        setError(error.message)
+        throw error
+      }
 
       setMessage("Check your email for the login link")
     } catch (error: any) {
+      console.error("Magic link error:", error)
       toast({
         title: "Error",
         description: error.message || "An error occurred sending the magic link",
@@ -84,9 +94,10 @@ export function LoginForm() {
   }
 
   return (
-    <Card className="w-full max-w-[500px] mx-auto">
-      <CardContent className="pt-8 px-8">
+    <Card className="max-w-[500px] mx-auto">
+      <CardContent className="pt-6">
         {message && <div className="bg-primary/10 text-primary p-3 rounded-md mb-4">{message}</div>}
+        {error && <div className="bg-destructive/10 text-destructive p-3 rounded-md mb-4">{error}</div>}
 
         <form onSubmit={handleEmailLogin} className="space-y-4">
           <div className="space-y-2">
@@ -144,7 +155,7 @@ export function LoginForm() {
         </Button>
       </CardContent>
 
-      <CardFooter className="flex flex-col space-y-4 border-t pt-6 pb-8 px-8">
+      <CardFooter className="flex flex-col space-y-4 border-t pt-6">
         <div className="text-center text-sm">
           Don't have an account?{" "}
           <Button variant="link" className="p-0 h-auto" asChild>

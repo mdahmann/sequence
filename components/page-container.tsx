@@ -5,7 +5,7 @@ interface PageContainerProps {
   children: React.ReactNode
   className?: string
   centered?: boolean
-  maxWidth?: "default" | "narrow" | "medium" | "wide"
+  maxWidth?: "default" | "narrow" | "wide"
 }
 
 export function PageContainer({
@@ -16,7 +16,6 @@ export function PageContainer({
 }: PageContainerProps) {
   const maxWidthClass = {
     narrow: "max-w-3xl",
-    medium: "max-w-4xl",
     default: "max-w-5xl",
     wide: "max-w-7xl",
   }[maxWidth]

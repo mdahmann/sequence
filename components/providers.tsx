@@ -10,7 +10,15 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 // Create a single instance of the Supabase client outside of any components
-const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey)
+// with proper configuration for authentication
+const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    flowType: 'pkce', // Use the more secure PKCE flow for authentication
+    detectSessionInUrl: true,
+  }
+})
 
 type SupabaseContext = {
   supabase: ReturnType<typeof createClient<Database>>
