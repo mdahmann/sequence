@@ -1,14 +1,13 @@
 import { createServerSupabaseClient } from "@/lib/supabase"
 import { notFound } from "next/navigation"
 import { SequenceEditor } from "./components/sequence-editor"
-import { PageContainer } from "@/components/page-container"
 
 export default async function FlowPage({ params }: { params: { id: string } }) {
-  // Store the ID in a variable to avoid the Next.js warning
-  const flowId = params.id
-  const supabase = createServerSupabaseClient()
-
   try {
+    // Store the ID in a variable to avoid the Next.js warning
+    const flowId = params.id
+    const supabase = createServerSupabaseClient()
+
     // Get the current user
     const {
       data: { session },
@@ -43,12 +42,9 @@ export default async function FlowPage({ params }: { params: { id: string } }) {
     sequence.sequence_poses.sort((a: any, b: any) => a.position - b.position)
 
     return (
-      <PageContainer>
-        <h1 className="text-3xl font-bold mb-2">{sequence.title}</h1>
-        <p className="text-muted-foreground mb-8">{sequence.description}</p>
-
+      <div className="container py-6 md:py-10">
         <SequenceEditor sequence={sequence} isOwner={isOwner} />
-      </PageContainer>
+      </div>
     )
   } catch (error) {
     console.error("Error in flow page:", error)
