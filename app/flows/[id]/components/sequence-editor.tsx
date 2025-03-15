@@ -44,9 +44,10 @@ interface Sequence {
 
 interface SequenceEditorProps {
   sequence: Sequence
+  isOwner?: boolean
 }
 
-export function SequenceEditor({ sequence }: SequenceEditorProps) {
+export function SequenceEditor({ sequence, isOwner = true }: SequenceEditorProps) {
   const router = useRouter()
   const { supabase } = useSupabase()
   const [items, setItems] = useState(sequence.sequence_poses)
@@ -158,25 +159,31 @@ export function SequenceEditor({ sequence }: SequenceEditorProps) {
     })
   }
 
+  // Only show edit controls if the user is the owner
+  const showEditControls = isOwner
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap gap-2 mb-4">
-        <Badge>{formatCategory(sequence.difficulty_level)}</Badge>
-        <Badge variant="outline">{formatCategory(sequence.style)}</Badge>
-        <Badge variant="outline">{sequence.duration} min</Badge>
-        <Badge variant="outline">{formatCategory(sequence.focus_area)}</Badge>
-      </div>
-
-      <div className="flex justify-between mb-6">
-        <Button variant="outline" onClick={handleExport}>
-          <Download className="h-4 w-4 mr-2" />
-          Export Sequence
-        </Button>
-
-        <Button onClick={handleSave} disabled={isSaving}>
-          <Save className="h-4 w-4 mr-2" />
-          {isSaving ? "Saving..." : "Save Changes"}
-        </Button>
+      <div className="flex justify-between items-center mb-6">
+        <div className="flex space-x-2">
+          <Badge variant="outline">{formatCategory(sequence.difficulty_level)}</Badge>
+          <Badge variant="outline">{formatCategory(sequence.style)}</Badge>
+          <Badge variant="outline">{formatCategory(sequence.focus_area)}</Badge>
+          {sequence.duration && <Badge variant="outline">{sequence.duration} min</Badge>}
+        </div>
+        
+        {showEditControls && (
+          <div className="flex space-x-2">
+            <Button onClick={handleSave} disabled={isSaving} size="sm">
+              {isSaving ? "Saving..." : "Save Changes"}
+              <Save className="ml-2 h-4 w-4" />
+            </Button>
+            <Button onClick={handleExport} variant="outline" size="sm">
+              Export
+              <Download className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </div>
 
       <DndContext
@@ -198,6 +205,7 @@ export function SequenceEditor({ sequence }: SequenceEditorProps) {
                 onCueChange={(cues) => handleCueChange(item.id, cues)}
                 onSideChange={(side) => handleSideChange(item.id, side)}
                 onDurationChange={(duration) => handleDurationChange(item.id, duration)}
+                isEditable={showEditControls}
               />
             ))}
           </div>
