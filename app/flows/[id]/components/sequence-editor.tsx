@@ -43,7 +43,6 @@ interface Sequence {
   focus_area: string | null
   is_ai_generated: boolean | null
   created_at: string
-  user_id: string
   sequence_poses: SequencePose[]
 }
 
@@ -67,28 +66,6 @@ export function SequenceEditor({ sequence, isOwner = true }: SequenceEditorProps
   const [flowBlocks, setFlowBlocks] = useState<FlowBlock[]>([])
   const [isPoseModalOpen, setIsPoseModalOpen] = useState(false)
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null)
-  const [clientSideIsOwner, setClientSideIsOwner] = useState(isOwner)
-
-  // Check authentication on the client side as well
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        const userIsOwner = session?.user?.id === sequence.user_id
-        console.log("Client-side auth check:", {
-          userLoggedIn: !!session?.user,
-          userIdInSession: session?.user?.id,
-          sequenceUserId: sequence.user_id,
-          userIsOwner
-        })
-        setClientSideIsOwner(userIsOwner)
-      } catch (error) {
-        console.error("Error checking auth:", error)
-      }
-    }
-    
-    checkAuth()
-  }, [supabase, sequence.user_id])
 
   // Set up DnD sensors
   const sensors = useSensors(
@@ -306,7 +283,7 @@ export function SequenceEditor({ sequence, isOwner = true }: SequenceEditorProps
   };
 
   // Only show edit controls if the user is the owner
-  const showEditControls = isOwner || clientSideIsOwner
+  const showEditControls = isOwner;
 
   const handleAddPose = (blockId: string) => {
     setActiveBlockId(blockId)

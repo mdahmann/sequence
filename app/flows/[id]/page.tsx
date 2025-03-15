@@ -1,20 +1,17 @@
 import { createServerSupabaseClient } from "@/lib/supabase"
 import { notFound } from "next/navigation"
-import { SequenceEditor } from "./components/sequence-editor"
-import { Metadata } from "next"
+import { ClientFlowPage } from "./components/client-flow-page"
 
-// This helps Next.js understand the params structure
-export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  return {
-    title: `Flow ${params.id}`,
+interface PageParams {
+  params: {
+    id: string
   }
 }
 
-// Use a different approach to handle the params
-export default async function FlowPage(props: { params: { id: string } }) {
+export default async function FlowPage({ params }: PageParams) {
   try {
-    // Access id directly from props to avoid the warning
-    const flowId = props.params.id
+    // Properly destructure the ID to avoid the Next.js warning
+    const { id } = params
     const supabase = createServerSupabaseClient()
 
     // Get the current user
@@ -36,7 +33,7 @@ export default async function FlowPage(props: { params: { id: string } }) {
           poses (*)
         )
       `)
-      .eq("id", flowId)
+      .eq("id", id)
       .single()
 
     if (error || !sequence) {
@@ -45,12 +42,13 @@ export default async function FlowPage(props: { params: { id: string } }) {
     }
 
     // Check if the user owns this sequence or if it's a shared sequence
-    const isOwner = session?.user?.id === sequence.user_id
-    console.log("Flow owner check:", { 
+    const initialIsOwner = session?.user?.id === sequence.user_id
+    console.log("Server Flow owner check:", { 
       userLoggedIn: !!session?.user,
+      userEmail: session?.user?.email,
       userIdInSession: session?.user?.id,
       sequenceUserId: sequence.user_id,
-      isOwner
+      isOwner: initialIsOwner
     })
     
     // Sort the poses by position
@@ -58,7 +56,7 @@ export default async function FlowPage(props: { params: { id: string } }) {
 
     return (
       <div className="container py-6 md:py-10">
-        <SequenceEditor sequence={sequence} isOwner={isOwner} />
+        <ClientFlowPage sequence={sequence} initialIsOwner={initialIsOwner} />
       </div>
     )
   } catch (error) {
