@@ -312,7 +312,13 @@ export function SequenceEditor({ sequence, isOwner = true }: SequenceEditorProps
     try {
       // Find the block
       const block = flowBlocks.find(b => b.id === activeBlockId)
-      if (!block) return
+      if (!block) {
+        console.error("Block not found:", activeBlockId);
+        return;
+      }
+
+      console.log("Adding pose to block:", block.title);
+      console.log("Pose to add:", pose);
 
       // Create a new sequence pose in the database
       const { data: newPose, error } = await supabase
@@ -330,31 +336,39 @@ export function SequenceEditor({ sequence, isOwner = true }: SequenceEditorProps
         .select("*, poses(*)")
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error("Error inserting pose:", error);
+        throw error;
+      }
+
+      console.log("New pose added to database:", newPose);
 
       // Update the flow blocks with the new pose
       setFlowBlocks(prevBlocks => {
         return prevBlocks.map(block => {
-          if (block.id !== activeBlockId) return block
+          if (block.id !== activeBlockId) return block;
 
-          return {
+          const updatedBlock = {
             ...block,
             poses: [...block.poses, newPose]
-          }
-        })
-      })
+          };
+          
+          console.log("Updated block:", updatedBlock);
+          return updatedBlock;
+        });
+      });
 
       toast({
         title: "Success",
         description: `Added ${pose.english_name} to the sequence`,
-      })
+      });
     } catch (error) {
-      console.error("Error adding pose:", error)
+      console.error("Error adding pose:", error);
       toast({
         title: "Error",
         description: "Failed to add pose to sequence",
         variant: "destructive",
-      })
+      });
     }
   }
 
@@ -434,7 +448,58 @@ export function SequenceEditor({ sequence, isOwner = true }: SequenceEditorProps
       
       // Set the active block and add the pose
       setActiveBlockId(blockId);
-      await handlePoseSelect(pose);
+      
+      // Find the block
+      const block = flowBlocks.find(b => b.id === blockId);
+      if (!block) {
+        console.error("Block not found for drop:", blockId);
+        return;
+      }
+      
+      console.log("Dropping pose into block:", block.title);
+      
+      // Create a new sequence pose in the database
+      const { data: newPose, error } = await supabase
+        .from("sequence_poses")
+        .insert({
+          sequence_id: sequence.id,
+          pose_id: pose.id,
+          position: (block.poses.length > 0 
+            ? Math.max(...block.poses.map(p => p.position)) + 10 
+            : 0),
+          duration: 30, // Default duration
+          side: "", // Default side
+          cues: "", // Default cues
+        })
+        .select("*, poses(*)")
+        .single();
+      
+      if (error) {
+        console.error("Error inserting pose during drop:", error);
+        throw error;
+      }
+      
+      console.log("New pose added to database from drop:", newPose);
+      
+      // Update the flow blocks with the new pose
+      setFlowBlocks(prevBlocks => {
+        return prevBlocks.map(b => {
+          if (b.id !== blockId) return b;
+          
+          const updatedBlock = {
+            ...b,
+            poses: [...b.poses, newPose]
+          };
+          
+          console.log("Updated block after drop:", updatedBlock);
+          return updatedBlock;
+        });
+      });
+      
+      toast({
+        title: "Success",
+        description: `Added ${pose.english_name} to the sequence`,
+      });
       
     } catch (error) {
       console.error("Error handling drop:", error);
@@ -448,7 +513,7 @@ export function SequenceEditor({ sequence, isOwner = true }: SequenceEditorProps
 
   return (
     <div className="flex">
-      <div className={`flex-1 space-y-8 pr-${isSidebarOpen ? '4' : '0'} transition-all duration-300`}>
+      <div className={`flex-1 space-y-8 ${isSidebarOpen ? 'pr-80' : 'pr-0'} transition-all duration-300`}>
         <div className="flex flex-col space-y-4">
           <div className="flex items-center justify-between">
             <Button variant="ghost" onClick={() => router.push('/flows')} className="px-0">
@@ -579,7 +644,7 @@ export function SequenceEditor({ sequence, isOwner = true }: SequenceEditorProps
       <div 
         className={`fixed top-0 right-0 h-full bg-background border-l border-border transition-all duration-300 z-10 ${
           isSidebarOpen ? 'w-80' : 'w-10'
-        } pt-16`}
+        } pt-24 mt-16`}
       >
         <Button 
           variant="ghost" 
@@ -591,7 +656,7 @@ export function SequenceEditor({ sequence, isOwner = true }: SequenceEditorProps
         </Button>
         
         {isSidebarOpen && (
-          <div className="p-4 h-full overflow-y-auto">
+          <div className="p-4 h-[calc(100vh-160px)] overflow-y-auto">
             <h3 className="font-medium mb-4">Pose Library</h3>
             <PoseSidebar onPoseSelect={handlePoseSelect} />
           </div>
