@@ -57,6 +57,9 @@ const config: Config = {
         'muted-beige': '#D3CDC4',
         'vibrant-blue': '#2B44FF',
         'earthy-orange': '#E2673C',
+        'beige': '#F5F2ED',
+        'dark-gray': '#1E1E1E',
+        'deep-charcoal-light': '#2A2A2A',
       },
       borderRadius: {
         lg: "var(--radius)",

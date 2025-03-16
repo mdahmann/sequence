@@ -1,7 +1,7 @@
 "use client"
 
-import { ReactNode } from "react"
 import { EnhancedToastProvider } from "@/components/ui-enhanced/toast-provider"
+import type { ReactNode } from "react"
 
 interface SequenceLayoutProps {
   children: ReactNode
@@ -9,12 +9,10 @@ interface SequenceLayoutProps {
 
 export default function SequenceEditorLayout({
   children,
-}: {
-  children: React.ReactNode
-}) {
+}: SequenceLayoutProps) {
   return (
     <EnhancedToastProvider>
-      <div className="min-h-screen">
+      <div className="min-h-screen w-full bg-beige dark:bg-dark-gray">
         {children}
       </div>
     </EnhancedToastProvider>
