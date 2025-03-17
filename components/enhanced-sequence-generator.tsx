@@ -94,6 +94,7 @@ export function EnhancedSequenceGenerator() {
         additionalNotes: additionalNotes || undefined,
       }
       
+      console.log("Generating sequence with params:", params);
       const sequence = await clientSequenceService.generateSequence(params)
       
       // Save the sequence to localStorage for the beta version
@@ -105,33 +106,40 @@ export function EnhancedSequenceGenerator() {
       router.push(`/edit/${sequence.id}`)
       
     } catch (error) {
+      console.error("Sequence generation error:", error);
+      
       // Handle specific error types
       const apiError = error as APIError;
       
+      // Authentication errors (401)
       if (apiError.status === 401) {
-        // Authentication required
+        console.log("Authentication error detected");
         showToast(
           "Please sign in or create an account to generate sequences",
           "error"
         );
-        // Optionally redirect to login page after a short delay
+        // Redirect to login page after a short delay
         setTimeout(() => {
           router.push("/login");
         }, 2000);
-      } else if (apiError.status === 403) {
-        // User account issue
+        return;
+      } 
+      
+      // User account issues (403)
+      if (apiError.status === 403) {
+        console.log("User account issue detected");
         showToast(
           "Your user account is not properly set up. Please contact support.",
           "error"
-        )
-      } else {
-        // Generic error
-        showToast(
-          apiError.message || "Failed to generate sequence", 
-          "error"
-        )
-      }
-      console.error("Failed to generate sequence:", error)
+        );
+        return;
+      } 
+      
+      // Handle all other errors
+      const errorMessage = apiError.message || "Failed to generate sequence";
+      console.log("Showing generic error toast:", errorMessage);
+      showToast(errorMessage, "error");
+      
     } finally {
       setIsGenerating(false)
     }
