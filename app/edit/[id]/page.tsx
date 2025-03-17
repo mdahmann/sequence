@@ -1151,9 +1151,11 @@ export default function SequenceEditorPage() {
                     className="p-2 bg-vibrant-blue text-white rounded-md hover:bg-vibrant-blue/90 transition-colors"
                     title="Save Settings"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M17 2.5H3C2.4 2.5 2 2.9 2 3.5v13c0 .6.4 1 1 1h14c.6 0 1-.4 1-1v-13c0-.6-.4-1-1-1zM10 15.5c-1.7 0-3-1.3-3-3s1.3-3 3-3 3 1.3 3 3-1.3 3-3 3zm4-10H5c-.6 0-1-.4-1-1v-1h11v1c0 .6-.4 1-1 1z" />
-                    </svg>
+                    <img 
+                      src="/images/save.svg" 
+                      alt="Save" 
+                      className="h-5 w-5" 
+                    />
                   </button>
                 </>
               ) : (
@@ -1173,9 +1175,11 @@ export default function SequenceEditorPage() {
                     )}
                     title="Save"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M17 2.5H3C2.4 2.5 2 2.9 2 3.5v13c0 .6.4 1 1 1h14c.6 0 1-.4 1-1v-13c0-.6-.4-1-1-1zM10 15.5c-1.7 0-3-1.3-3-3s1.3-3 3-3 3 1.3 3 3-1.3 3-3 3zm4-10H5c-.6 0-1-.4-1-1v-1h11v1c0 .6-.4 1-1 1z" />
-                    </svg>
+                    <img 
+                      src="/images/save.svg" 
+                      alt="Save" 
+                      className="h-5 w-5" 
+                    />
                   </button>
                 </>
               )}
