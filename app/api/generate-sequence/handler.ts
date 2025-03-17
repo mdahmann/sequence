@@ -28,6 +28,12 @@ export async function generateSequence({
   console.log(`Starting sequence generation for user ${userId}`)
   console.log(`Parameters: duration=${duration}, difficulty=${difficulty}, style=${style}, focusArea=${focusArea}`)
   
+  // Validate userId is provided and is a valid UUID
+  if (!userId) {
+    console.error("User ID is required for sequence generation")
+    return { error: "UNAUTHENTICATED_USER" }
+  }
+  
   try {
     // Create a Supabase client
     const supabase = createServerSupabaseClient()

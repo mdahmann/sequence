@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { serverSequenceService } from "@/lib/services/server-sequence-service"
+import { createServerSupabaseClient } from "@/lib/supabase"
 
 // Schema for sequence parameters validation
 const sequenceParamsSchema = z.object({
@@ -13,6 +14,21 @@ const sequenceParamsSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    // First, check authentication
+    const supabase = createServerSupabaseClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    
+    if (!session?.user?.id) {
+      console.log("API route: User not authenticated")
+      return NextResponse.json(
+        { 
+          error: "Authentication required", 
+          message: "Please sign in or create an account to generate sequences." 
+        },
+        { status: 401 }
+      )
+    }
+    
     // Parse and validate request body
     const body = await req.json()
     const validatedParams = sequenceParamsSchema.safeParse(body)
