@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search, ChevronDown, ChevronUp } from "lucide-react"
+import { Search, ChevronDown, ChevronUp, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useSupabase } from "@/components/providers"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Button } from "@/components/ui/button"
 import { LoadingSpinner } from "@/components/ui-enhanced/loading-spinner"
 
 interface Pose {
@@ -32,9 +32,8 @@ export function PoseSidebar({ onPoseSelect }: PoseSidebarProps) {
   const [difficulties, setDifficulties] = useState<string[]>([])
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [selectedDifficulties, setSelectedDifficulties] = useState<string[]>([])
-  const [activeTab, setActiveTab] = useState<string>("all")
+  const [activeFilter, setActiveFilter] = useState<"difficulty" | "category" | null>(null)
   const [draggedPose, setDraggedPose] = useState<Pose | null>(null)
-  const [difficultyExpanded, setDifficultyExpanded] = useState(false)
 
   useEffect(() => {
     const fetchPoses = async () => {
@@ -201,15 +200,8 @@ export function PoseSidebar({ onPoseSelect }: PoseSidebarProps) {
       )
     }
     
-    // Filter by tab
-    if (activeTab !== "all") {
-      result = result.filter((pose) => 
-        pose.category && pose.category.includes(activeTab)
-      )
-    }
-
     setFilteredPoses(result)
-  }, [searchQuery, selectedCategories, selectedDifficulties, poses, activeTab])
+  }, [searchQuery, selectedCategories, selectedDifficulties, poses])
 
   const handleCategoryToggle = (category: string) => {
     setSelectedCategories((prev) =>
@@ -225,6 +217,22 @@ export function PoseSidebar({ onPoseSelect }: PoseSidebarProps) {
         ? prev.filter((d) => d !== difficulty)
         : [...prev, difficulty]
     )
+  }
+
+  const clearDifficultyFilters = () => {
+    setSelectedDifficulties([]);
+  }
+
+  const clearCategoryFilters = () => {
+    setSelectedCategories([]);
+  }
+
+  const removeFilter = (type: "difficulty" | "category", value: string) => {
+    if (type === "difficulty") {
+      setSelectedDifficulties(prev => prev.filter(d => d !== value));
+    } else {
+      setSelectedCategories(prev => prev.filter(c => c !== value));
+    }
   }
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, pose: Pose) => {
@@ -244,9 +252,6 @@ export function PoseSidebar({ onPoseSelect }: PoseSidebarProps) {
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(" ")
   }
-  
-  // Get unique categories for tabs
-  const tabCategories = ["all", ...categories.filter(c => c !== "all")];
 
   return (
     <div className="flex flex-col h-[calc(100vh-5rem)]">
@@ -260,50 +265,103 @@ export function PoseSidebar({ onPoseSelect }: PoseSidebarProps) {
         />
       </div>
       
-      {/* Tabs for quick category navigation */}
-      <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="mb-4">
-        <TabsList className="w-full overflow-x-auto flex whitespace-nowrap scrollbar-thin scrollbar-thumb-gray-300 pb-1">
-          {tabCategories.map((category) => (
-            <TabsTrigger 
-              key={category} 
-              value={category}
-              className="px-3 py-1 capitalize"
-            >
-              {category === "all" ? "All" : formatCategory(category)}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
-
-      <div className="space-y-3 mb-4">
-        {/* Collapsible difficulty filter */}
-        <div className="border rounded-md overflow-hidden">
-          <button 
-            className="w-full px-3 py-2 flex justify-between items-center text-sm font-medium hover:bg-accent/50"
-            onClick={() => setDifficultyExpanded(!difficultyExpanded)}
-          >
-            <span>Filter by Difficulty</span>
-            {difficultyExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          </button>
-          
-          {difficultyExpanded && (
-            <div className="p-3 pt-0">
-              <div className="flex flex-wrap gap-2 pt-3 border-t">
-                {difficulties.map((difficulty) => (
-                  <Badge
-                    key={difficulty}
-                    variant={selectedDifficulties.includes(difficulty) ? "default" : "outline"}
-                    className="cursor-pointer capitalize"
-                    onClick={() => handleDifficultyToggle(difficulty)}
-                  >
-                    {formatCategory(difficulty)}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+      {/* Filter buttons side by side */}
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <Button 
+          variant={activeFilter === "difficulty" ? "default" : "outline"}
+          className="w-full justify-between"
+          onClick={() => setActiveFilter(activeFilter === "difficulty" ? null : "difficulty")}
+        >
+          <span>Difficulty</span>
+          {activeFilter === "difficulty" ? <ChevronUp className="h-4 w-4 ml-2" /> : <ChevronDown className="h-4 w-4 ml-2" />}
+        </Button>
+        
+        <Button 
+          variant={activeFilter === "category" ? "default" : "outline"}
+          className="w-full justify-between"
+          onClick={() => setActiveFilter(activeFilter === "category" ? null : "category")}
+        >
+          <span>Category</span>
+          {activeFilter === "category" ? <ChevronUp className="h-4 w-4 ml-2" /> : <ChevronDown className="h-4 w-4 ml-2" />}
+        </Button>
       </div>
+      
+      {/* Filter dropdown content */}
+      {activeFilter && (
+        <div className="border rounded-md p-3 mb-3">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="text-sm font-medium">
+              {activeFilter === "difficulty" ? "Select Difficulty" : "Select Category"}
+            </h3>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => activeFilter === "difficulty" ? clearDifficultyFilters() : clearCategoryFilters()}
+              className="h-7 px-2 text-xs"
+            >
+              Clear
+            </Button>
+          </div>
+          
+          <div className="flex flex-wrap gap-2">
+            {activeFilter === "difficulty" ? 
+              difficulties.map(difficulty => (
+                <Badge
+                  key={difficulty}
+                  variant={selectedDifficulties.includes(difficulty) ? "default" : "outline"}
+                  className="cursor-pointer capitalize"
+                  onClick={() => handleDifficultyToggle(difficulty)}
+                >
+                  {formatCategory(difficulty)}
+                </Badge>
+              )) :
+              categories.map(category => (
+                <Badge
+                  key={category}
+                  variant={selectedCategories.includes(category) ? "default" : "outline"}
+                  className="cursor-pointer capitalize"
+                  onClick={() => handleCategoryToggle(category)}
+                >
+                  {formatCategory(category)}
+                </Badge>
+              ))
+            }
+          </div>
+        </div>
+      )}
+      
+      {/* Active filters display */}
+      {(selectedDifficulties.length > 0 || selectedCategories.length > 0) && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          {selectedDifficulties.map(difficulty => (
+            <Badge key={`active-${difficulty}`} variant="secondary" className="pr-1">
+              <span className="mr-1">{formatCategory(difficulty)}</span>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-4 w-4 p-0 hover:bg-transparent"
+                onClick={() => removeFilter("difficulty", difficulty)}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </Badge>
+          ))}
+          
+          {selectedCategories.map(category => (
+            <Badge key={`active-${category}`} variant="secondary" className="pr-1">
+              <span className="mr-1">{formatCategory(category)}</span>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-4 w-4 p-0 hover:bg-transparent"
+                onClick={() => removeFilter("category", category)}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </Badge>
+          ))}
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex-1 flex items-center justify-center">
