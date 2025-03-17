@@ -21,6 +21,18 @@ const nextConfig = {
     parallelServerBuildTraces: true,
     parallelServerCompiles: true,
   },
+  // Add rewrites to handle 404 pages with a static page
+  async rewrites() {
+    return {
+      fallback: [
+        {
+          // If Next.js can't find a page, it will fallback to this page
+          source: '/:path*',
+          destination: '/static-404',
+        },
+      ],
+    }
+  },
 }
 
 mergeConfig(nextConfig, userConfig)

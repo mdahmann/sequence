@@ -7,13 +7,13 @@ const authRoutes = ['/login', '/signup']
 
 export async function middleware(request: NextRequest) {
   // Check for all paths that should be completely bypassed
-  // This includes non-existent routes that would result in 404s
   const url = request.nextUrl.pathname
   
   // Skip middleware for 404 pages or static resources
   if (url.startsWith('/_next') || 
       url === '/404' || 
       url === '/not-found' ||
+      url === '/static-404' ||
       url.includes('favicon')) {
     return NextResponse.next()
   }
@@ -26,6 +26,6 @@ export async function middleware(request: NextRequest) {
 // Only run middleware on a subset of routes
 export const config = {
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|static-404).*)',
   ],
 } 
