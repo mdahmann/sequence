@@ -15,7 +15,7 @@ export const serverSequenceService = {
     try {
       // Fetch user ID from session (or use a placeholder ID for non-authenticated users)
       const { data: { session } } = await supabase.auth.getSession()
-      const userId = session?.user?.id || "anonymous"
+      const userId = session?.user?.id || createId() // Use a generated UUID instead of "anonymous"
       
       // Call the existing AI sequence generator
       const { sequence: generatedSequence, error } = await generateAISequence({
@@ -96,7 +96,8 @@ export const serverSequenceService = {
         if (!pose.poses) return
         
         // Access the pose data - from Supabase, poses is an object, not an array
-        const poseData = pose.poses as {
+        // Use unknown as intermediate type to fix the TypeScript error
+        const poseData = (pose.poses as unknown) as {
           id: string
           english_name: string
           sanskrit_name?: string
