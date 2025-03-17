@@ -125,7 +125,7 @@ const exampleSequence = {
 };
 
 export default async function PreviewPage() {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
   let sequence = null;
 
   try {
