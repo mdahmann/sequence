@@ -11,11 +11,24 @@ interface Toast {
   type: ToastType
   duration?: number
   position?: "bottom-right" | "center"
+  actions?: {
+    label: string
+    onClick: () => void
+  }[]
 }
 
 interface ToastContextValue {
   toasts: Toast[]
-  showToast: (message: string, type?: ToastType, duration?: number, position?: "bottom-right" | "center") => void
+  showToast: (
+    message: string, 
+    type?: ToastType, 
+    duration?: number, 
+    position?: "bottom-right" | "center",
+    actions?: {
+      label: string
+      onClick: () => void
+    }[]
+  ) => void
   hideToast: (id: string) => void
 }
 
@@ -40,10 +53,14 @@ export function EnhancedToastProvider({ children }: EnhancedToastProviderProps) 
     message: string, 
     type: ToastType = "info", 
     duration: number = 5000,
-    position: "bottom-right" | "center" = "bottom-right"
+    position: "bottom-right" | "center" = "bottom-right",
+    actions?: {
+      label: string
+      onClick: () => void
+    }[]
   ) => {
     const id = Math.random().toString(36).substring(2, 9)
-    setToasts((prev) => [...prev, { id, message, type, duration, position }])
+    setToasts((prev) => [...prev, { id, message, type, duration, position, actions }])
     
     if (duration !== Infinity) {
       setTimeout(() => {
@@ -137,6 +154,28 @@ export function EnhancedToastProvider({ children }: EnhancedToastProviderProps) 
                   </svg>
                 </button>
               </div>
+              
+              {/* Action buttons */}
+              {toast.actions && toast.actions.length > 0 && (
+                <div className="mt-4 flex justify-center space-x-3">
+                  {toast.actions.map((action, index) => (
+                    <button
+                      key={index}
+                      onClick={() => {
+                        action.onClick();
+                        hideToast(toast.id);
+                      }}
+                      className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                        index === 0 
+                          ? "bg-white text-vibrant-blue hover:bg-gray-100" 
+                          : "bg-white/20 text-white hover:bg-white/30"
+                      }`}
+                    >
+                      {action.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </motion.div>
           ))}
         </AnimatePresence>

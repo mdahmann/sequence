@@ -117,13 +117,19 @@ export function EnhancedSequenceGenerator() {
         showToast(
           "Please sign in or create an account to generate sequences",
           "auth",
-          8000, // Show for 8 seconds
-          "center" // Display in center of screen
+          12000, // Show for longer (12 seconds)
+          "center", // Display in center of screen
+          [
+            {
+              label: "Sign In",
+              onClick: () => router.push("/login")
+            },
+            {
+              label: "Sign Up",
+              onClick: () => router.push("/register")
+            }
+          ]
         );
-        // Redirect to login page after a short delay
-        setTimeout(() => {
-          router.push("/login");
-        }, 4000);
         return;
       } 
       
