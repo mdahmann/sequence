@@ -1155,6 +1155,7 @@ export default function SequenceEditorPage() {
                       src="/images/save.svg" 
                       alt="Save" 
                       className="h-5 w-5" 
+                      style={{ filter: "brightness(0) invert(1)", height: "18px", width: "18px" }}
                     />
                   </button>
                 </>
@@ -1179,6 +1180,7 @@ export default function SequenceEditorPage() {
                       src="/images/save.svg" 
                       alt="Save" 
                       className="h-5 w-5" 
+                      style={{ filter: "brightness(0) invert(1)", height: "18px", width: "18px" }}
                     />
                   </button>
                 </>
