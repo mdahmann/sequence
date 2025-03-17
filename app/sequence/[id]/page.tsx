@@ -699,7 +699,7 @@ export default function SequenceEditorPage() {
           We couldn't find the sequence you're looking for.
         </p>
         <a 
-          href="/generate/beta"
+          href="/generate"
           className="px-4 py-2 bg-vibrant-blue text-white rounded-md hover:bg-vibrant-blue/90 transition-colors"
         >
           Generate New Sequence
