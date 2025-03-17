@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react"
 import { useParams, useRouter, notFound } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { LoadingSpinner } from "@/components/ui-enhanced/loading-spinner"
+import { Skeleton, PoseSkeleton, SequencePhaseSkeleton } from "@/components/ui-enhanced/skeleton"
 import { useToast } from "@/components/ui-enhanced/toast-provider"
 import { Sequence, SequencePhase, SequencePose } from "@/types/sequence"
 import { cn } from "@/lib/utils"
@@ -27,7 +28,9 @@ export default function SequenceEditorPage() {
   const sequenceId = params?.id as string
   
   const [isLoading, setIsLoading] = useState(true)
+  const [isPosesLoading, setIsPosesLoading] = useState(false)
   const [sequence, setSequence] = useState<Sequence | null>(null)
+  const [structureLoaded, setStructureLoaded] = useState(false)
   const [selectedPhaseIndex, setSelectedPhaseIndex] = useState(0)
   const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true)
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true)
@@ -699,7 +702,26 @@ export default function SequenceEditorPage() {
             
             if (localSequence) {
               console.log(`Client: Found sequence in localStorage: ${sequenceId}`);
-              setSequence(localSequence);
+              
+              // Check if sequence has poses or just structure
+              const hasPoses = localSequence.phases.some((phase: any) => 
+                phase.poses && phase.poses.length > 0 && 
+                phase.poses[0].name !== "__loading__"
+              );
+              
+              // If we have the structure but poses are loading placeholders
+              if (localSequence.structureOnly) {
+                console.log(`Client: Found structure-only sequence, showing skeletons for poses`);
+                setSequence(localSequence);
+                setStructureLoaded(true);
+                setIsPosesLoading(true);
+              } else {
+                // Full sequence with poses
+                console.log(`Client: Found complete sequence with poses`);
+                setSequence(localSequence);
+                setIsPosesLoading(false);
+              }
+              
               setIsLoading(false);
               return;
             }
@@ -728,6 +750,7 @@ export default function SequenceEditorPage() {
         const data = await response.json();
         console.log(`Client: Successfully fetched sequence:`, data.id);
         setSequence(data);
+        setIsPosesLoading(false);
       } catch (error) {
         console.error("Client: Failed to fetch sequence:", error);
         showToast("Failed to load sequence", "error");
@@ -742,6 +765,64 @@ export default function SequenceEditorPage() {
       fetchSequence();
     }
   }, [sequenceId, showToast, router]);
+  
+  // Add effect to complete pose generation if we're viewing a structure-only sequence
+  useEffect(() => {
+    // Only proceed if we have a structure-only sequence
+    if (sequence && sequence.structureOnly && isPosesLoading) {
+      console.log(`Client: Generating poses for structure-only sequence: ${sequence.id}`);
+      
+      const completePoseGeneration = async () => {
+        try {
+          const response = await fetch(`/api/sequences/complete-poses`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              sequenceId: sequence.id,
+              difficulty: sequence.difficulty,
+              style: sequence.style,
+              focus: sequence.focus
+            })
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
+          }
+          
+          const data = await response.json();
+          console.log(`Client: Received complete sequence with poses:`, data.id);
+          
+          // Update localStorage with the completed sequence
+          try {
+            const localSequences = localStorage.getItem("generatedSequences");
+            if (localSequences) {
+              const sequences = JSON.parse(localSequences);
+              const updatedSequences = sequences.map((seq: any) => 
+                seq.id === data.id ? data : seq
+              );
+              localStorage.setItem("generatedSequences", JSON.stringify(updatedSequences));
+              
+              // Update state
+              setSequence(data);
+              setIsPosesLoading(false);
+              
+              showToast("Sequence with poses generated successfully!", "success");
+            }
+          } catch (localError) {
+            console.error("Error updating localStorage:", localError);
+          }
+        } catch (error) {
+          console.error("Client: Failed to complete pose generation:", error);
+          showToast("Failed to generate poses. Please try again later.", "error");
+          // Keep loading state, allow user to still work with the structure
+        }
+      };
+      
+      completePoseGeneration();
+    }
+  }, [sequence, isPosesLoading, showToast]);
   
   if (!sequenceId || isLoading) {
     return (
@@ -1230,126 +1311,134 @@ export default function SequenceEditorPage() {
                     </p>
 
                     <div className="space-y-3 ml-11">
-                      {phase.poses.map((pose, index) => (
-                        <motion.div
-                          key={pose.id}
-                          layoutId={pose.id}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ 
-                            type: "spring", 
-                            stiffness: 500, 
-                            damping: 30,
-                            delay: index * 0.05 
-                          }}
-                          className={cn(
-                            "bg-warm-white dark:bg-deep-charcoal-light rounded-lg shadow-sm overflow-hidden w-full",
-                            isDragging && draggedPose?.id === pose.id ? "border-2 border-vibrant-blue" : "",
-                            pose.side === "left" ? "border-l-4 border-l-blue-400" : "",
-                            pose.side === "right" ? "border-r-4 border-r-purple-400" : ""
-                          )}
-                          drag="y"
-                          dragConstraints={{ top: 0, bottom: 0 }}
-                          dragElastic={0.1}
-                          onDragStart={() => {
-                            setIsDragging(true)
-                            setDraggedPose(pose)
-                          }}
-                          onDragEnd={() => {
-                            setIsDragging(false)
-                            setDraggedPose(null)
-                          }}
-                        >
-                          <div className="flex items-stretch">
-                            {/* Drag Handle */}
-                            <div className="bg-gray-100 dark:bg-gray-800 flex items-center justify-center px-3 cursor-move">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-                              </svg>
-                            </div>
-                            
-                            {/* Side Indicator */}
-                            {pose.side && (
-                              <div className={cn(
-                                "w-1.5 h-full",
-                                pose.side === "left" ? "bg-blue-400/20" : "bg-purple-400/20"
-                              )}></div>
+                      {isPosesLoading ? (
+                        // Show skeleton UI when poses are loading
+                        Array(3).fill(0).map((_, i) => (
+                          <PoseSkeleton key={i} />
+                        ))
+                      ) : (
+                        // Show actual poses when loaded
+                        phase.poses.map((pose, index) => (
+                          <motion.div
+                            key={pose.id}
+                            layoutId={pose.id}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ 
+                              type: "spring", 
+                              stiffness: 500, 
+                              damping: 30,
+                              delay: index * 0.05 
+                            }}
+                            className={cn(
+                              "bg-warm-white dark:bg-deep-charcoal-light rounded-lg shadow-sm overflow-hidden w-full",
+                              isDragging && draggedPose?.id === pose.id ? "border-2 border-vibrant-blue" : "",
+                              pose.side === "left" ? "border-l-4 border-l-blue-400" : "",
+                              pose.side === "right" ? "border-r-4 border-r-purple-400" : ""
                             )}
-                            
-                            {/* Pose Info */}
-                            <div className={cn(
-                              "flex-grow p-4 flex justify-between items-center",
-                              pose.side === "left" ? "bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-900/10 dark:to-transparent" : "",
-                              pose.side === "right" ? "bg-gradient-to-l from-purple-50/50 to-transparent dark:from-purple-900/10 dark:to-transparent" : ""
-                            )}>
-                              <div className="flex items-center">
-                                {pose.side === "left" && (
-                                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 mr-3 flex-shrink-0">
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                                    </svg>
-                                  </div>
-                                )}
-                                {pose.side === "right" && (
-                                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 mr-3 flex-shrink-0">
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                                    </svg>
-                                  </div>
-                                )}
-                                <div>
-                                  <div className="font-medium flex items-center">
-                                    {pose.name}
-                                    {pose.side && (
-                                      <button 
-                                        onClick={() => togglePoseSide(pose.id)}
-                                        className={cn(
-                                          "ml-2 px-2 py-0.5 text-xs rounded-full",
-                                          pose.side === "left" 
-                                            ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100" 
-                                            : "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100"
-                                        )}
-                                      >
-                                        {pose.side === "left" ? "Left" : "Right"}
-                                      </button>
-                                    )}
-                                  </div>
-                                  {pose.sanskrit_name && (
-                                    <div className="text-sm text-gray-500 dark:text-gray-400 italic">
-                                      {pose.sanskrit_name}
-                                    </div>
-                                  )}
-                                </div>
+                            drag="y"
+                            dragConstraints={{ top: 0, bottom: 0 }}
+                            dragElastic={0.1}
+                            onDragStart={() => {
+                              setIsDragging(true)
+                              setDraggedPose(pose)
+                            }}
+                            onDragEnd={() => {
+                              setIsDragging(false)
+                              setDraggedPose(null)
+                            }}
+                          >
+                            <div className="flex items-stretch">
+                              {/* Drag Handle */}
+                              <div className="bg-gray-100 dark:bg-gray-800 flex items-center justify-center px-3 cursor-move">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                                </svg>
                               </div>
                               
-                              {/* Duration Selector */}
-                              <div className="flex items-center space-x-3">
-                                <button 
-                                  onClick={() => handleDurationChange(pose.id, Math.max(5, pose.duration_seconds - 5))}
-                                  className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M5 10a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z" clipRule="evenodd" />
-                                  </svg>
-                                </button>
-                                
-                                <div className="w-16 text-center font-medium">
-                                  {Math.floor(pose.duration_seconds / 60)}:{(pose.duration_seconds % 60).toString().padStart(2, '0')}
+                              {/* Side Indicator */}
+                              {pose.side && (
+                                <div className={cn(
+                                  "w-1.5 h-full",
+                                  pose.side === "left" ? "bg-blue-400/20" : "bg-purple-400/20"
+                                )}></div>
+                              )}
+                              
+                              {/* Pose Info */}
+                              <div className={cn(
+                                "flex-grow p-4 flex justify-between items-center",
+                                pose.side === "left" ? "bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-900/10 dark:to-transparent" : "",
+                                pose.side === "right" ? "bg-gradient-to-l from-purple-50/50 to-transparent dark:from-purple-900/10 dark:to-transparent" : ""
+                              )}>
+                                <div className="flex items-center">
+                                  {pose.side === "left" && (
+                                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 mr-3 flex-shrink-0">
+                                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                                      </svg>
+                                    </div>
+                                  )}
+                                  {pose.side === "right" && (
+                                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 mr-3 flex-shrink-0">
+                                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                      </svg>
+                                    </div>
+                                  )}
+                                  <div>
+                                    <div className="font-medium flex items-center">
+                                      {pose.name}
+                                      {pose.side && (
+                                        <button 
+                                          onClick={() => togglePoseSide(pose.id)}
+                                          className={cn(
+                                            "ml-2 px-2 py-0.5 text-xs rounded-full",
+                                            pose.side === "left" 
+                                              ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100" 
+                                              : "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100"
+                                          )}
+                                        >
+                                          {pose.side === "left" ? "Left" : "Right"}
+                                        </button>
+                                      )}
+                                    </div>
+                                    {pose.sanskrit_name && (
+                                      <div className="text-sm text-gray-500 dark:text-gray-400 italic">
+                                        {pose.sanskrit_name}
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                                 
-                                <button 
-                                  onClick={() => handleDurationChange(pose.id, pose.duration_seconds + 5)}
-                                  className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
-                                  </svg>
-                                </button>
+                                {/* Duration Selector */}
+                                <div className="flex items-center space-x-3">
+                                  <button 
+                                    onClick={() => handleDurationChange(pose.id, Math.max(5, pose.duration_seconds - 5))}
+                                    className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                      <path fillRule="evenodd" d="M5 10a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z" clipRule="evenodd" />
+                                    </svg>
+                                  </button>
+                                  
+                                  <div className="w-16 text-center font-medium">
+                                    {Math.floor(pose.duration_seconds / 60)}:{(pose.duration_seconds % 60).toString().padStart(2, '0')}
+                                  </div>
+                                  
+                                  <button 
+                                    onClick={() => handleDurationChange(pose.id, pose.duration_seconds + 5)}
+                                    className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                      <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+                                    </svg>
+                                  </button>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </motion.div>
-                      ))}
+                          </motion.div>
+                        ))
+                      )}
                     </div>
                   </div>
                 )}

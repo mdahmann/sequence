@@ -91,6 +91,11 @@ const filledSequenceSchema = {
 };
 
 export const serverSequenceService = {
+  // Add method to get Supabase client
+  async getSupabaseClient() {
+    return await createServerSupabaseClient();
+  },
+
   async generateSequence(params: SequenceParams): Promise<Sequence> {
     console.log("serverSequenceService: Generating sequence with params:", params)
     
@@ -102,7 +107,7 @@ export const serverSequenceService = {
     })
     
     // Create a server-side Supabase client
-    const supabase = await createServerSupabaseClient()
+    const supabase = await this.getSupabaseClient()
     
     try {
       // Fetch all poses from the database without requiring authentication
@@ -156,64 +161,63 @@ export const serverSequenceService = {
   
   // Step 1: Generate the sequence structure
   async generateSequenceStructure(params: SequenceParams): Promise<SequenceStructure> {
-    console.log("Generating sequence structure with params:", params);
+    if (!openai) {
+      throw new Error("OpenAI client not initialized");
+    }
+    
+    // Get yoga guidelines content
+    const yogaGuidelines = await this.getYogaGuidelines(params.style, params.focus, params.difficulty);
+    
+    // Build the structure prompt
+    const structurePrompt = `
+      As an experienced yoga teacher, create a ${params.style} yoga class structure for a ${params.duration}-minute ${params.difficulty} class focusing on ${params.focus}.
+      ${params.peakPose ? `This sequence should build toward ${params.peakPose.name} as the peak pose.` : ''}
+      ${params.additionalNotes ? `Additional requirements: ${params.additionalNotes}` : ''}
+      
+      Create a cohesive yoga practice with:
+      1. Class title that captures the essence of the practice
+      2. Brief overall intention/theme
+      3. 4-7 logical practice segments (avoid just "warm-up, main, cool down")
+      4. For each segment include:
+         - Name (use authentic yoga terminology)
+         - Duration in minutes (total should equal ${params.duration})
+         - Purpose/focus of this segment
+         - General pose types to include (not specific poses)
+         - Intensity level (1-10)
+      
+      YOGA STYLE GUIDELINES:
+      ${yogaGuidelines}
+    `;
+    
+    console.log("serverSequenceService: Calling OpenAI API for sequence structure");
+    
+    // Call OpenAI with function calling to get a structured response
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4-turbo",
+      temperature: 0.7,
+      messages: [
+        {
+          role: "system",
+          content: "You are an expert yoga teacher designing authentic, safe sequences following traditional yoga principles."
+        },
+        {
+          role: "user",
+          content: structurePrompt
+        }
+      ],
+      functions: [{ name: "generateStructure", parameters: sequenceStructureSchema }],
+      function_call: { name: "generateStructure" }
+    });
+    
+    // Parse the response
+    const functionCall = completion.choices[0].message.function_call;
+    if (!functionCall || !functionCall.arguments) {
+      throw new Error("Failed to generate sequence structure");
+    }
     
     try {
-      if (!openai) {
-        throw new Error("OpenAI client not initialized");
-      }
-      
-      // Get yoga guidelines content
-      const yogaGuidelines = await this.getYogaGuidelines(params.style, params.focus, params.difficulty);
-      
-      // Build the structure prompt
-      const prompt = `
-        As an experienced yoga teacher, create a ${params.style} yoga class structure for a ${params.duration}-minute ${params.difficulty} class focusing on ${params.focus}.
-        ${params.peakPose ? `This sequence should build toward ${params.peakPose.name} as the peak pose.` : ''}
-        ${params.additionalNotes ? `Additional requirements: ${params.additionalNotes}` : ''}
-        
-        Create a cohesive yoga practice with:
-        1. Class title that captures the essence of the practice
-        2. Brief overall intention/theme
-        3. 4-7 logical practice segments (avoid just "warm-up, main, cool down")
-        4. For each segment include:
-           - Name (use authentic yoga terminology)
-           - Duration in minutes (total should equal ${params.duration})
-           - Purpose/focus of this segment
-           - General pose types to include (not specific poses)
-           - Intensity level (1-10)
-        
-        YOGA STYLE GUIDELINES:
-        ${yogaGuidelines}
-      `;
-      
-      console.log("serverSequenceService: Calling OpenAI API for sequence structure");
-      
-      // Get response from OpenAI
-      const response = await openai.chat.completions.create({
-        model: "gpt-4-0125-preview", // Using GPT-4 Turbo for better quality
-        temperature: 0.7,
-        messages: [
-          {
-            role: "system", 
-            content: "You are an expert yoga teacher designing authentic, safe sequences following traditional yoga principles."
-          },
-          { 
-            role: "user", 
-            content: prompt 
-          }
-        ],
-        functions: [{ name: "generateSequenceStructure", parameters: sequenceStructureSchema }],
-        function_call: { name: "generateSequenceStructure" }
-      });
-      
-      // Parse the response
-      const functionCall = response.choices[0].message.function_call;
-      if (!functionCall || !functionCall.arguments) {
-        throw new Error("Failed to generate structure: No valid function call returned");
-      }
-      
       const structure: SequenceStructure = JSON.parse(functionCall.arguments);
+      console.log("serverSequenceService: Successfully generated sequence structure");
       
       // Ensure total duration matches requested duration
       const totalDuration = structure.segments.reduce((sum, segment) => sum + segment.durationMinutes, 0);
@@ -228,8 +232,8 @@ export const serverSequenceService = {
       
       return structure;
     } catch (error) {
-      console.error("Error generating sequence structure:", error);
-      throw error;
+      console.error("serverSequenceService: Error parsing structure:", error);
+      throw new Error("Failed to parse sequence structure");
     }
   },
   

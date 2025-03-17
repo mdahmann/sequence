@@ -126,9 +126,34 @@ export function SequenceGenerator() {
         })
       }
 
-      // Redirect to the newly created sequence
+      // After successful generation
       if (result.sequence && result.sequence.id) {
-        router.push(`/flows/${result.sequence.id}`)
+        // If this is just the sequence structure (step 1), store it in localStorage
+        if (result.structureOnly) {
+          console.log("SequenceGenerator: Received structure-only sequence. Saving to localStorage:", result.sequence.id);
+          
+          // Save in localStorage
+          try {
+            const existingSequences = localStorage.getItem("generatedSequences");
+            const sequences = existingSequences ? JSON.parse(existingSequences) : [];
+            
+            // Add the new sequence
+            sequences.push(result.sequence);
+            localStorage.setItem("generatedSequences", JSON.stringify(sequences));
+            
+            // Show toast indicating poses are being generated
+            toast({
+              title: "Sequence structure created!",
+              description: "Poses are being generated. You'll see them shortly.",
+            });
+          } catch (storageError) {
+            console.error("SequenceGenerator: Error saving to localStorage:", storageError);
+          }
+        }
+
+        // Redirect to the flow editor
+        console.log("SequenceGenerator: Redirecting to editor for sequence:", result.sequence.id);
+        router.push(`/edit/${result.sequence.id}`);
       } else {
         setError("Failed to create sequence - no sequence ID returned.")
         toast({

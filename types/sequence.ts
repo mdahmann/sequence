@@ -66,4 +66,5 @@ export interface Sequence {
   is_favorite: boolean
   tags?: string[]
   notes?: string
+  structureOnly?: boolean // Flag to indicate this is just the structure without fully generated poses
 } 
