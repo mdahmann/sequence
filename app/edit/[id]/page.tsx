@@ -11,6 +11,26 @@ import { Skeleton, PoseSkeleton } from "@/components/ui-enhanced/skeleton"
 import { ChevronDown, ChevronRight, ChevronLeft, Plus, Pencil, Download, RotateCcw, RotateCw, History, X, Save } from "lucide-react"
 import { PoseSidebar } from "./components/pose-sidebar"
 import HandDrawnSpiral from "@/components/hand-drawn-spiral"
+import { SortablePoseItem } from "./components/sortable-pose-item"
+import { 
+  DndContext, 
+  closestCenter, 
+  KeyboardSensor, 
+  PointerSensor, 
+  useSensor, 
+  useSensors,
+  DragEndEvent,
+  DragOverEvent,
+  DragStartEvent,
+  DragOverlay 
+} from "@dnd-kit/core"
+import { 
+  arrayMove, 
+  SortableContext, 
+  sortableKeyboardCoordinates, 
+  verticalListSortingStrategy 
+} from "@dnd-kit/sortable"
+import { restrictToParentElement, restrictToVerticalAxis } from "@dnd-kit/modifiers"
 
 interface PoseData {
   id: string
@@ -68,6 +88,22 @@ export default function SequenceEditorPage() {
   const headerRef = useRef<HTMLDivElement | null>(null)
   const phaseRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const isPoseGenerationInProgress = useRef(false);
+  
+  // Add sensors for drag and drop
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+  
+  // Add state for active drag
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activePhaseId, setActivePhaseId] = useState<string | null>(null);
   
   // Fetch sequence data from localStorage (beta approach)
   useEffect(() => {
@@ -505,26 +541,160 @@ export default function SequenceEditorPage() {
     )
   }
 
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>, phaseId: string) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragOverPhaseId(phaseId)
-  }
+  // Legacy versions for standard HTML drag events
+  const handleDragOverLegacy = (e: React.DragEvent<HTMLDivElement>, phaseId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverPhaseId(phaseId);
+  };
 
   const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragOverPhaseId(null)
-  }
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverPhaseId(null);
+  };
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>, phaseId: string) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragOverPhaseId(null)
+  // DndKit event handlers
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    setActiveId(active.id as string);
+    
+    // Find the phase this pose belongs to
+    if (sequence) {
+      for (const phase of sequence.phases) {
+        if (phase.poses.some(pose => pose.id === active.id)) {
+          setActivePhaseId(phase.id);
+          break;
+        }
+      }
+    }
+    
+    setIsDragging(true);
+    
+    // Find the pose that's being dragged
+    const draggedPose = findPoseById(active.id as string);
+    setDraggedPose(draggedPose);
+  };
+  
+  const handleDndDragOver = (event: DragOverEvent) => {
+    const { active, over } = event;
+    
+    if (!over) return;
+    
+    // If hovering over a different phase, highlight it
+    if (sequence) {
+      for (const phase of sequence.phases) {
+        if (phase.poses.some(pose => pose.id === over.id)) {
+          setDragOverPhaseId(phase.id);
+          break;
+        }
+      }
+    }
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    setActiveId(null);
+    setActivePhaseId(null);
+    setIsDragging(false);
+    setDraggedPose(null);
+    setDragOverPhaseId(null);
+    
+    if (!over || !sequence) return;
+    
+    // Find the phase IDs for the active and over items
+    let sourcePhaseId: string | null = null;
+    let destinationPhaseId: string | null = null;
+    let sourcePhaseIndex = -1;
+    let destinationPhaseIndex = -1;
+    let sourcePoseIndex = -1;
+    let destinationPoseIndex = -1;
+    
+    // Find the phase and pose indices
+    sequence.phases.forEach((phase, phaseIndex) => {
+      phase.poses.forEach((pose, poseIndex) => {
+        if (pose.id === active.id) {
+          sourcePhaseId = phase.id;
+          sourcePhaseIndex = phaseIndex;
+          sourcePoseIndex = poseIndex;
+        }
+        if (pose.id === over.id) {
+          destinationPhaseId = phase.id;
+          destinationPhaseIndex = phaseIndex;
+          destinationPoseIndex = poseIndex;
+        }
+      });
+    });
+    
+    // If we couldn't find the phases or poses, do nothing
+    if (sourcePhaseId === null || destinationPhaseId === null || 
+        sourcePhaseIndex === -1 || destinationPhaseIndex === -1 || 
+        sourcePoseIndex === -1 || destinationPoseIndex === -1) {
+      return;
+    }
+    
+    // Clone the sequence to avoid direct state mutations
+    const updatedSequence = JSON.parse(JSON.stringify(sequence)) as Sequence;
+    
+    // Same phase, just reorder
+    if (sourcePhaseId === destinationPhaseId) {
+      const phase = updatedSequence.phases[sourcePhaseIndex];
+      
+      // Use arrayMove to reorder the poses within the phase
+      phase.poses = arrayMove(phase.poses, sourcePoseIndex, destinationPoseIndex);
+      
+      // Update positions to reflect new order
+      phase.poses.forEach((pose, idx) => {
+        pose.position = idx + 1;
+      });
+      
+      // Get the name of the moved pose for the history action
+      const poseName = phase.poses[destinationPoseIndex].name;
+      
+      setSequence(updatedSequence);
+      saveToHistory(updatedSequence, `Reordered "${poseName}" in ${phase.name}`);
+    } 
+    // Different phases, move between them
+    else {
+      const sourcePhase = updatedSequence.phases[sourcePhaseIndex];
+      const destinationPhase = updatedSequence.phases[destinationPhaseIndex];
+      
+      // Get the pose to move
+      const poseToMove = sourcePhase.poses[sourcePoseIndex];
+      
+      // Get the name of the moved pose for the history action
+      const poseName = poseToMove.name;
+      
+      // Remove from source phase
+      sourcePhase.poses.splice(sourcePoseIndex, 1);
+      
+      // Add to destination phase
+      destinationPhase.poses.splice(destinationPoseIndex, 0, poseToMove);
+      
+      // Update positions in both phases
+      sourcePhase.poses.forEach((pose, idx) => {
+        pose.position = idx + 1;
+      });
+      
+      destinationPhase.poses.forEach((pose, idx) => {
+        pose.position = idx + 1;
+      });
+      
+      setSequence(updatedSequence);
+      saveToHistory(updatedSequence, `Moved "${poseName}" from ${sourcePhase.name} to ${destinationPhase.name}`);
+    }
+  };
+
+  // Add back the handleDrop function
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, phaseId: string, targetPoseId?: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverPhaseId(null);
 
     try {
-      const poseData = JSON.parse(e.dataTransfer.getData("pose")) as PoseData
-      if (!sequence) return
+      const poseData = JSON.parse(e.dataTransfer.getData("pose")) as PoseData;
+      if (!sequence) return;
       
       // Find the phase name
       const targetPhase = sequence.phases.find(phase => phase.id === phaseId);
@@ -538,63 +708,56 @@ export default function SequenceEditorPage() {
             name: poseData.name,
             sanskrit_name: poseData.sanskrit_name || undefined,
             duration_seconds: 30,
-            position: phase.poses.length + 1,
+            position: 0, // Will be updated below
             side: poseData.side_option ? "left" : null
+          };
+          
+          let updatedPoses = [...phase.poses];
+          
+          // If dropping at a specific pose, insert at that position
+          if (targetPoseId) {
+            const targetIndex = updatedPoses.findIndex(p => p.id === targetPoseId);
+            if (targetIndex !== -1) {
+              updatedPoses.splice(targetIndex, 0, newPose);
+            } else {
+              updatedPoses.push(newPose);
+            }
+          } else {
+            // No target, add to the end
+            updatedPoses.push(newPose);
           }
+          
+          // Update positions for all poses
+          updatedPoses = updatedPoses.map((pose, index) => ({
+            ...pose,
+            position: index + 1
+          }));
           
           return {
             ...phase,
-            poses: [...phase.poses, newPose]
-          }
+            poses: updatedPoses
+          };
         }
-        return phase
-      })
+        return phase;
+      });
 
       const updatedSequence = {
         ...sequence,
         phases: updatedPhases
-      }
+      };
       
-      setSequence(updatedSequence)
-      saveToHistory(updatedSequence, `Dropped "${poseData.name}" into ${phaseName}`)
+      setSequence(updatedSequence);
+      saveToHistory(updatedSequence, `Dropped "${poseData.name}" into ${phaseName}`);
     } catch (error) {
-      console.error("Error handling pose drop:", error)
+      console.error("Error handling pose drop:", error);
     }
-  }
+  };
 
-  const handlePoseSelect = (poseData: PoseData) => {
-    if (!sequence) return
+  // Create a drop handler that captures the target pose
+  const createPoseDropHandler = (phaseId: string, targetPoseId: string) => (e: React.DragEvent<HTMLDivElement>) => {
+    handleDrop(e, phaseId, targetPoseId);
+  };
 
-    const selectedPhase = sequence.phases[selectedPhaseIndex]
-    const updatedPhases = sequence.phases.map((phase: SequencePhase, index: number) => {
-      if (index === selectedPhaseIndex) {
-        const newPose: SequencePose = {
-          id: `${poseData.id}-${Date.now()}`,
-          pose_id: poseData.id,
-          name: poseData.name,
-          sanskrit_name: poseData.sanskrit_name || undefined,
-          duration_seconds: 30,
-          position: phase.poses.length + 1,
-          side: poseData.side_option ? "left" : null
-        }
-
-        return {
-          ...phase,
-          poses: [...phase.poses, newPose]
-        }
-      }
-      return phase
-    })
-
-    const updatedSequence = {
-      ...sequence,
-      phases: updatedPhases
-    }
-    
-    setSequence(updatedSequence)
-    saveToHistory(updatedSequence, `Added "${poseData.name}" to ${selectedPhase.name}`)
-  }
-  
   // Initialize temp settings when sequence loads
   useEffect(() => {
     if (sequence) {
@@ -844,6 +1007,39 @@ export default function SequenceEditorPage() {
       completePoseGeneration();
     }
   }, [sequence, isPosesLoading, showToast]);
+  
+  // Helper function to find a pose by ID
+  const findPoseById = (poseId: string): SequencePose | null => {
+    if (!sequence) return null;
+    
+    for (const phase of sequence.phases) {
+      const pose = phase.poses.find(p => p.id === poseId);
+      if (pose) return pose;
+    }
+    
+    return null;
+  };
+  
+  // Re-adding handlePoseSelect functionality
+  const handlePoseSelect = (poseData: PoseData) => {
+    if (!sequence) return;
+    
+    const selectedPhase = sequence.phases[selectedPhaseIndex];
+    
+    // Use handleDrop with the selected phase ID
+    const phaseId = selectedPhase.id;
+    
+    // Create a fake drag event
+    const fakeEvent = {
+      preventDefault: () => {},
+      stopPropagation: () => {},
+      dataTransfer: {
+        getData: () => JSON.stringify(poseData)
+      }
+    } as unknown as React.DragEvent<HTMLDivElement>;
+    
+    handleDrop(fakeEvent, phaseId);
+  };
   
   if (!sequenceId || isLoading) {
     return (
@@ -1333,7 +1529,10 @@ export default function SequenceEditorPage() {
                 {expandedPhases.includes(phase.id) && (
                   <div 
                     className="px-6 pb-4"
-                    onDragOver={(e) => handleDragOver(e, phase.id)}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      handleDragOverLegacy(e, phase.id);
+                    }}
                     onDragLeave={handleDragLeave}
                     onDrop={(e) => handleDrop(e, phase.id)}
                   >
@@ -1348,127 +1547,37 @@ export default function SequenceEditorPage() {
                           <PoseSkeleton key={i} />
                         ))
                       ) : (
-                        // Show actual poses when loaded
-                        phase.poses.map((pose, index) => (
-                          <motion.div
-                            key={pose.id}
-                            layoutId={pose.id}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ 
-                              type: "spring", 
-                              stiffness: 500, 
-                              damping: 30,
-                              delay: index * 0.05 
-                            }}
-                            className={cn(
-                              "bg-white dark:bg-deep-charcoal-light rounded-lg shadow-sm overflow-hidden w-full",
-                              isDragging && draggedPose?.id === pose.id ? "border-2 border-vibrant-blue" : "",
-                              pose.side === "left" ? "border-l-4 border-l-blue-400" : "",
-                              pose.side === "right" ? "border-r-4 border-r-purple-400" : ""
-                            )}
-                            drag="y"
-                            dragConstraints={{ top: 0, bottom: 0 }}
-                            dragElastic={0.1}
-                            onDragStart={() => {
-                              setIsDragging(true)
-                              setDraggedPose(pose)
-                            }}
-                            onDragEnd={() => {
-                              setIsDragging(false)
-                              setDraggedPose(null)
-                            }}
+                        // Show actual poses with DndKit
+                        <DndContext
+                          sensors={sensors}
+                          collisionDetection={closestCenter}
+                          onDragStart={handleDragStart}
+                          onDragOver={handleDndDragOver}
+                          onDragEnd={handleDragEnd}
+                          modifiers={[restrictToVerticalAxis]}
+                        >
+                          <SortableContext 
+                            items={phase.poses.map(pose => pose.id)}
+                            strategy={verticalListSortingStrategy}
                           >
-                            <div className="flex items-stretch">
-                              {/* Drag Handle */}
-                              <div className="bg-gray-100 dark:bg-gray-800 flex items-center justify-center px-3 cursor-move">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-                                </svg>
+                            {phase.poses.map((pose, index) => (
+                              <div
+                                key={pose.id}
+                                className="relative"
+                                onDragOver={(e) => e.preventDefault()}
+                                onDrop={(e) => createPoseDropHandler(phase.id, pose.id)(e)}
+                              >
+                                <SortablePoseItem
+                                  id={pose.id}
+                                  pose={pose}
+                                  index={index}
+                                  onDurationChange={handleDurationChange}
+                                  onSideToggle={togglePoseSide}
+                                />
                               </div>
-                              
-                              {/* Side Indicator */}
-                              {pose.side && (
-                                <div className={cn(
-                                  "w-1.5 h-full",
-                                  pose.side === "left" ? "bg-blue-400/20" : "bg-purple-400/20"
-                                )}></div>
-                              )}
-                              
-                              {/* Pose Info */}
-                              <div className={cn(
-                                "flex-grow p-4 flex justify-between items-center",
-                                pose.side === "left" ? "bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-900/10 dark:to-transparent" : "",
-                                pose.side === "right" ? "bg-gradient-to-l from-purple-50/50 to-transparent dark:from-purple-900/10 dark:to-transparent" : ""
-                              )}>
-                                <div className="flex items-center">
-                                  {pose.side === "left" && (
-                                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 mr-3 flex-shrink-0">
-                                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                                      </svg>
-                                    </div>
-                                  )}
-                                  {pose.side === "right" && (
-                                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 mr-3 flex-shrink-0">
-                                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                                      </svg>
-                                    </div>
-                                  )}
-                                  <div>
-                                    <div className="font-medium flex items-center">
-                                      {pose.name}
-                                      {pose.side && (
-                                        <button 
-                                          onClick={() => togglePoseSide(pose.id)}
-                                          className={cn(
-                                            "ml-2 px-2 py-0.5 text-xs rounded-full",
-                                            pose.side === "left" 
-                                              ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100" 
-                                              : "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100"
-                                          )}
-                                        >
-                                          {pose.side === "left" ? "Left" : "Right"}
-                                        </button>
-                                      )}
-                                    </div>
-                                    {pose.sanskrit_name && (
-                                      <div className="text-sm text-gray-500 dark:text-gray-400 italic">
-                                        {pose.sanskrit_name}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                                
-                                {/* Duration Selector */}
-                                <div className="flex items-center space-x-3">
-                                  <button 
-                                    onClick={() => handleDurationChange(pose.id, Math.max(5, pose.duration_seconds - 5))}
-                                    className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
-                                  >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                      <path fillRule="evenodd" d="M5 10a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z" clipRule="evenodd" />
-                                    </svg>
-                                  </button>
-                                  
-                                  <div className="w-16 text-center font-medium">
-                                    {Math.floor(pose.duration_seconds / 60)}:{(pose.duration_seconds % 60).toString().padStart(2, '0')}
-                                  </div>
-                                  
-                                  <button 
-                                    onClick={() => handleDurationChange(pose.id, pose.duration_seconds + 5)}
-                                    className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
-                                  >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                      <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
-                                    </svg>
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          </motion.div>
-                        ))
+                            ))}
+                          </SortableContext>
+                        </DndContext>
                       )}
                     </div>
                   </div>
