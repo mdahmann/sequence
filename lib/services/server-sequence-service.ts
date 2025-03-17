@@ -27,42 +27,9 @@ export const serverSequenceService = {
       const userId = session.user.id
       console.log(`Server sequence service: Authenticated user ID: ${userId}`)
       
-      // Check if this user exists in the users table
-      console.log(`Server sequence service: Checking if user ${userId} exists in database`)
-      const { data: user, error: userError } = await supabase
-        .from("users")
-        .select("id")
-        .eq("id", userId)
-        .single()
-      
-      if (userError || !user) {
-        // User exists in auth but not in users table - create the user record
-        console.log(`Server sequence service: User ID ${userId} not found in users table, creating new user record`)
-        
-        // Get user details from auth
-        const { data: userData } = await supabase.auth.getUser(userId)
-        
-        // Create user record in users table
-        const { data: newUser, error: createError } = await supabase
-          .from("users")
-          .insert({
-            id: userId,
-            email: userData?.user?.email,
-            created_at: now,
-            updated_at: now
-          })
-          .select()
-          .single()
-        
-        if (createError) {
-          console.error(`Server sequence service: Failed to create user record`, createError)
-          throw new Error(`Failed to create user record: ${createError.message}`)
-        }
-        
-        console.log(`Server sequence service: Created new user record for ${userId}`)
-      } else {
-        console.log(`Server sequence service: Verified user ${userId} exists in database, proceeding with sequence generation`)
-      }
+      // We now skip the users table check entirely since we know the user is authenticated
+      // through Supabase Auth, which is sufficient for generating sequences
+      console.log(`Server sequence service: Using authenticated user ID for sequence generation: ${userId}`)
       
       // Call the existing AI sequence generator
       const { sequence: generatedSequence, error } = await generateAISequence({

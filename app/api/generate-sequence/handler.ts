@@ -34,6 +34,8 @@ export async function generateSequence({
     return { error: "UNAUTHENTICATED_USER" }
   }
   
+  console.log(`Using authenticated user ID for sequence generation: ${userId}`)
+  
   try {
     // Create a Supabase client
     const supabase = createServerSupabaseClient()
