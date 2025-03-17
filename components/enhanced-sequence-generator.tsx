@@ -119,10 +119,6 @@ export function EnhancedSequenceGenerator() {
   return (
     <div className="bg-warm-white dark:bg-deep-charcoal-light rounded-lg shadow-sm overflow-hidden">
       <div className="p-6">
-        <h2 className="text-xl font-semibold mb-6 text-deep-charcoal dark:text-warm-white">
-          Generate Your Sequence
-        </h2>
-        
         <div className="space-y-6">
           {/* Duration slider */}
           <div>

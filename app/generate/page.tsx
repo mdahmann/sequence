@@ -9,67 +9,58 @@ export const metadata: Metadata = {
 
 export default function GeneratePage() {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-      <div className="lg:col-span-4 space-y-6">
-        <div className="bg-warm-white dark:bg-deep-charcoal-light rounded-lg p-6 shadow-sm">
-          <h2 className="text-xl font-semibold mb-4 text-deep-charcoal dark:text-warm-white">
-            Features
-          </h2>
-          <ul className="space-y-3 text-muted-gray dark:text-muted-beige">
-            <li className="flex items-start">
-              <div className="flex-shrink-0 h-5 w-5 text-vibrant-blue">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <span className="ml-2">Animated UI components</span>
-            </li>
-            <li className="flex items-start">
-              <div className="flex-shrink-0 h-5 w-5 text-vibrant-blue">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <span className="ml-2">Improved error handling</span>
-            </li>
-            <li className="flex items-start">
-              <div className="flex-shrink-0 h-5 w-5 text-vibrant-blue">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <span className="ml-2">Enhanced toast notifications</span>
-            </li>
-            <li className="flex items-start">
-              <div className="flex-shrink-0 h-5 w-5 text-vibrant-blue">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <span className="ml-2">Better loading indicators</span>
-            </li>
-          </ul>
-        </div>
-        
-        <div className="bg-warm-white dark:bg-deep-charcoal-light rounded-lg p-6 shadow-sm">
-          <h2 className="text-xl font-semibold mb-4 text-deep-charcoal dark:text-warm-white">
-            How It Works
-          </h2>
-          <ol className="list-decimal list-inside space-y-2 text-muted-gray dark:text-muted-beige ml-4">
-            <li>Select your preferred duration (5-90 minutes)</li>
-            <li>Choose a difficulty level that matches your experience</li>
-            <li>Pick a yoga style you want to practice</li>
-            <li>Select which area of the body you want to focus on</li>
-            <li>Add any specific requirements (optional)</li>
-            <li>Click "Generate Sequence" to create your custom practice</li>
-          </ol>
-        </div>
+    <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="mb-12">
+        <h1 className="text-3xl md:text-4xl font-sans font-normal tracking-tight text-foreground mb-4 text-center">
+          Generate Your Sequence
+        </h1>
+        <p className="text-center text-muted-foreground max-w-2xl mx-auto">
+          Create a customized yoga sequence based on your preferences and needs.
+        </p>
       </div>
       
-      <div className="lg:col-span-8">
+      <div className="mb-16">
         <EnhancedToastProvider>
           <EnhancedSequenceGenerator />
         </EnhancedToastProvider>
+      </div>
+      
+      <div className="bg-warm-white dark:bg-deep-charcoal-light rounded-lg p-8 shadow-sm">
+        <h2 className="text-2xl font-sans font-normal tracking-tight text-foreground mb-6 text-center">
+          How It Works
+        </h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="flex flex-col items-center text-center">
+            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+              <span className="text-xl font-semibold text-primary">1</span>
+            </div>
+            <h3 className="text-lg font-medium mb-2">Set Parameters</h3>
+            <p className="text-muted-foreground">
+              Choose duration, difficulty, style, and focus area for your practice.
+            </p>
+          </div>
+          
+          <div className="flex flex-col items-center text-center">
+            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+              <span className="text-xl font-semibold text-primary">2</span>
+            </div>
+            <h3 className="text-lg font-medium mb-2">Generate</h3>
+            <p className="text-muted-foreground">
+              Our AI creates a balanced sequence with mindful transitions.
+            </p>
+          </div>
+          
+          <div className="flex flex-col items-center text-center">
+            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+              <span className="text-xl font-semibold text-primary">3</span>
+            </div>
+            <h3 className="text-lg font-medium mb-2">Customize</h3>
+            <p className="text-muted-foreground">
+              Edit your sequence in our intuitive editor to make it perfect.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   )
