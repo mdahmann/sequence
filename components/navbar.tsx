@@ -78,7 +78,6 @@ export function Navbar() {
   const navItems = [
     { name: "Home", path: "/" },
     { name: "Generate", path: "/generate" },
-    { name: "Preview", path: "/preview" },
     { name: "Pose Library", path: "/pose-library" },
     { name: "Flows", path: "/flows" },
   ]
