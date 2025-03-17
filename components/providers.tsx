@@ -5,7 +5,7 @@ import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
 import { createClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/supabase"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -30,9 +30,15 @@ const Context = createContext<SupabaseContext | undefined>(undefined)
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const router = useRouter()
+  const pathname = usePathname()
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false)
   
   useEffect(() => {
+    // Don't run auth checks on 404 pages to prevent refresh loops
+    if (pathname === "/not-found" || pathname === "/404") {
+      return;
+    }
+    
     // Check authentication status when component mounts
     const checkAuth = async () => {
       try {
@@ -58,7 +64,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
             setIsAuthenticated(!!session)
             
             // Refresh the page after auth state changes to ensure all components update
-            router.refresh()
+            // Don't refresh on not-found pages
+            if (pathname !== "/not-found" && pathname !== "/404") {
+              router.refresh()
+            }
           }
         )
         
@@ -71,7 +80,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     }
     
     checkAuth()
-  }, [router])
+  }, [router, pathname])
   
   return (
     <Context.Provider value={{ supabase, isAuthenticated }}>

@@ -26,6 +26,12 @@ export function Navbar() {
     // Check for the current session when the component mounts
     const checkSession = async () => {
       try {
+        // Skip auth check for 404 page to prevent refresh loops
+        if (pathname === "/not-found" || pathname === "/404") {
+          setIsLoading(false)
+          return () => {}
+        }
+        
         setIsLoading(true)
         const { data: { session } } = await supabase.auth.getSession()
         console.log("Navbar auth state:", session ? "Authenticated" : "Not authenticated")
@@ -50,7 +56,7 @@ export function Navbar() {
     }
     
     checkSession()
-  }, [supabase])
+  }, [supabase, pathname])
 
   const handleSignOut = async () => {
     try {
