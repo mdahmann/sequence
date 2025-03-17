@@ -163,37 +163,20 @@ export function EnhancedSequenceGenerator() {
         peakPose: peakPose || undefined,
       }
       
-      console.log("Generating sequence with parameters:", params)
+      console.log("Generating sequence with params:", params)
       
-      // STEP 1: Generate just the sequence structure
-      const structure = await clientSequenceService.generateStructure(params)
+      // Generate sequence
+      const sequence = await clientSequenceService.generateSequence(params)
       
-      // Create a skeleton sequence with empty poses
-      const skeletonSequence = clientSequenceService.createSkeletonSequence(structure, params)
+      // Update state
+      setGeneratedSequence(sequence)
+      setTabValue("result")
       
       // Save to local storage for beta version
-      saveSequenceToLocalStorage(skeletonSequence)
+      saveSequenceToLocalStorage(sequence)
       
-      // Start navigating to the editor with the skeleton sequence
-      router.push(`/edit/${skeletonSequence.id}`)
-      
-      // STEP 2: Fill in the poses (happens asynchronously after navigation)
-      try {
-        // This runs in the background while the user is already on the editor page
-        const filledSequence = await clientSequenceService.fillWithPoses(structure, params)
-        
-        // Update the sequence in localStorage
-        saveSequenceToLocalStorage(filledSequence)
-        
-        console.log("Sequence fully generated with poses")
-      } catch (fillError: any) {
-        console.error("Error filling sequence with poses:", fillError)
-        toast({
-          title: "Error Completing Sequence",
-          description: "Your sequence structure is ready, but we had trouble filling in all the poses. You can try regenerating poses from the editor.",
-          variant: "destructive",
-        })
-      }
+      // Navigate to editor
+      router.push(`/edit/${sequence.id}`)
     } catch (error: any) {
       console.error("Sequence generation error:", error)
       

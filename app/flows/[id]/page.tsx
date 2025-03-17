@@ -12,7 +12,7 @@ export default async function FlowPage({ params }: PageParams) {
   try {
     // Properly destructure the ID to avoid the Next.js warning
     const { id } = params
-    const supabase = await createServerSupabaseClient()
+    const supabase = createServerSupabaseClient()
 
     // Get the current user
     const {

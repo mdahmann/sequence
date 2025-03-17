@@ -69,7 +69,7 @@ export interface Sequence {
 
 // Function to map database sequence to our phase-based structure
 export async function mapDBSequenceToPhases(dbSequence: any): Promise<Sequence> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = createServerSupabaseClient();
   
   // Get all poses in this sequence
   const { data: sequencePoses, error: posesError } = await supabase
@@ -204,7 +204,7 @@ export async function mapDBSequenceToPhases(dbSequence: any): Promise<Sequence> 
 
 // Function to get a sequence with phases
 export async function getSequenceWithPhases(sequenceId: string): Promise<Sequence | null> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = createServerSupabaseClient();
   
   // Get the sequence
   const { data: sequence, error } = await supabase
@@ -237,7 +237,7 @@ export async function saveSequencePhases(
   title: string,
   phases: SequencePhase[]
 ): Promise<boolean> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = createServerSupabaseClient();
   
   try {
     // First update the sequence title if needed
