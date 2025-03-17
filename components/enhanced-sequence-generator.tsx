@@ -116,12 +116,14 @@ export function EnhancedSequenceGenerator() {
         console.log("Authentication error detected");
         showToast(
           "Please sign in or create an account to generate sequences",
-          "error"
+          "auth",
+          8000, // Show for 8 seconds
+          "center" // Display in center of screen
         );
         // Redirect to login page after a short delay
         setTimeout(() => {
           router.push("/login");
-        }, 2000);
+        }, 4000);
         return;
       } 
       
