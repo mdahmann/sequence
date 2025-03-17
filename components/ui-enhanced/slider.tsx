@@ -257,31 +257,11 @@ export function EnhancedSlider({
 
   return (
     <div className={`relative ${className}`}>
-      {/* Title and value */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="font-medium text-gray-700 dark:text-gray-300">
-          {title || "Duration (mins)"}
+      {/* Value display only */}
+      <div className="flex items-center justify-end mb-2">
+        <div className="font-semibold text-vibrant-blue text-sm px-2 py-0.5 bg-vibrant-blue/10 rounded-md">
+          {currentValue} mins
         </div>
-        {isEditing ? (
-          <input
-            ref={inputRef}
-            type="number"
-            min={min}
-            max={max}
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onBlur={confirmInput}
-            className="w-12 px-1 py-0.5 text-center text-sm font-medium bg-vibrant-blue/10 rounded border border-vibrant-blue"
-          />
-        ) : (
-          <div 
-            onClick={startEditing}
-            className="cursor-pointer font-semibold text-vibrant-blue text-sm px-2 py-0.5 bg-vibrant-blue/10 rounded-md hover:bg-vibrant-blue/20 transition-colors"
-          >
-            {currentValue}
-          </div>
-        )}
       </div>
       
       {/* Slider track */}
