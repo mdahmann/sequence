@@ -5,6 +5,7 @@ import { generateSequence as generateAISequence } from "@/app/api/generate-seque
 // Uses the OpenAI integration to generate yoga sequences
 export const serverSequenceService = {
   async generateSequence(params: SequenceParams): Promise<Sequence> {
+    console.log("Server sequence service: Starting sequence generation")
     const supabase = createServerSupabaseClient()
     
     // Create unique IDs
@@ -14,18 +15,20 @@ export const serverSequenceService = {
     
     try {
       // Check if the user is authenticated before proceeding
+      console.log("Server sequence service: Checking authentication status")
       const { data: { session } } = await supabase.auth.getSession()
       
       if (!session?.user?.id) {
-        console.log("User authentication required: No valid session found")
+        console.log("Server sequence service: No valid session found - throwing UNAUTHENTICATED_USER error")
         throw new Error("UNAUTHENTICATED_USER")
       }
       
       // Use the authenticated user ID
       const userId = session.user.id
-      console.log(`Authenticated user ID: ${userId}`)
+      console.log(`Server sequence service: Authenticated user ID: ${userId}`)
       
       // Check if this user exists in the users table
+      console.log(`Server sequence service: Checking if user ${userId} exists in database`)
       const { data: user, error: userError } = await supabase
         .from("users")
         .select("id")
@@ -33,11 +36,11 @@ export const serverSequenceService = {
         .single()
       
       if (userError || !user) {
-        console.error(`User ID ${userId} not found in users table`, userError)
+        console.error(`Server sequence service: User ID ${userId} not found in users table`, userError)
         throw new Error("USER_NOT_FOUND")
       }
       
-      console.log(`Verified user ${userId} exists in database, proceeding with sequence generation`)
+      console.log(`Server sequence service: Verified user ${userId} exists in database, proceeding with sequence generation`)
       
       // Call the existing AI sequence generator
       const { sequence: generatedSequence, error } = await generateAISequence({
