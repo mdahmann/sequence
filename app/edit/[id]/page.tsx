@@ -8,7 +8,7 @@ import { useToast } from "@/components/ui-enhanced/toast-provider"
 import { Sequence, SequencePhase, SequencePose } from "@/types/sequence"
 import { cn } from "@/lib/utils"
 import { Skeleton, PoseSkeleton } from "@/components/ui-enhanced/skeleton"
-import { ChevronDown, ChevronRight, ChevronLeft, Plus, Pencil, Download, RotateCcw, RotateCw, History } from "lucide-react"
+import { ChevronDown, ChevronRight, ChevronLeft, Plus, Pencil, Download, RotateCcw, RotateCw, History, X } from "lucide-react"
 import { PoseSidebar } from "./components/pose-sidebar"
 import HandDrawnSpiral from "@/components/hand-drawn-spiral"
 
@@ -1108,9 +1108,10 @@ export default function SequenceEditorPage() {
             <div>
               <button
                 onClick={handleExit}
-                className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 px-4 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
+                className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
+                title="Back to Home"
               >
-                ← Back to Home
+                <X className="h-5 w-5" />
               </button>
             </div>
 
@@ -1140,34 +1141,41 @@ export default function SequenceEditorPage() {
                 <>
                   <button
                     onClick={handleSettingsCancel}
-                    className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
+                    className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
+                    title="Cancel"
                   >
-                    Cancel
+                    <X className="h-5 w-5" />
                   </button>
                   <button
                     onClick={handleSettingsSave}
-                    className="px-4 py-2 bg-vibrant-blue text-white rounded-md hover:bg-vibrant-blue/90 transition-colors"
+                    className="p-2 bg-vibrant-blue text-white rounded-md hover:bg-vibrant-blue/90 transition-colors"
+                    title="Save Settings"
                   >
-                    Save Settings
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
                   </button>
                 </>
               ) : (
                 <>
                   <button
                     onClick={() => {/* TODO: Implement export functionality */}}
-                    className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-2"
+                    className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
+                    title="Export"
                   >
-                    <Download className="h-4 w-4" />
-                    Export
+                    <Download className="h-5 w-5" />
                   </button>
                   <button
                     onClick={handleSave}
                     className={cn(
-                      "px-4 py-2 bg-vibrant-blue text-white rounded-md hover:bg-vibrant-blue/90 transition-colors flex items-center gap-2",
+                      "p-2 bg-vibrant-blue text-white rounded-md hover:bg-vibrant-blue/90 transition-colors",
                       hasUnsavedChanges && "animate-pulse"
                     )}
+                    title="Save"
                   >
-                    Save
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h1a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h2v5.586l-1.293-1.293zM9 4a1 1 0 012 0v2H9V4z" />
+                    </svg>
                   </button>
                 </>
               )}
