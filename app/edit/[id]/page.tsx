@@ -38,9 +38,6 @@ export default function SequenceEditorPage() {
   const [isDragging, setIsDragging] = useState(false)
   const [draggedPose, setDraggedPose] = useState<SequencePose | null>(null)
   const [dragOverPhaseId, setDragOverPhaseId] = useState<string | null>(null)
-  const [dragSourcePhaseId, setDragSourcePhaseId] = useState<string | null>(null)
-  const [dragOverPoseId, setDragOverPoseId] = useState<string | null>(null)
-  const [isDraggedOut, setIsDraggedOut] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [isExiting, setIsExiting] = useState(false)
   const [isEditingSettings, setIsEditingSettings] = useState(false)
@@ -520,247 +517,49 @@ export default function SequenceEditorPage() {
     setDragOverPhaseId(null)
   }
 
-  // Handle starting dragging a pose
-  const handlePoseDragStart = (e: React.DragEvent<HTMLDivElement>, pose: SequencePose, phaseId: string) => {
-    setIsDragging(true)
-    setDraggedPose(pose)
-    setDragSourcePhaseId(phaseId)
-    
-    // Set data for drop handling
-    e.dataTransfer.setData("poseId", pose.id)
-    e.dataTransfer.setData("sourcePhaseId", phaseId)
-    e.dataTransfer.effectAllowed = "move"
-    
-    // Create ghost image of the dragged item
-    const dragImage = e.currentTarget.cloneNode(true) as HTMLDivElement
-    dragImage.style.position = 'absolute'
-    dragImage.style.opacity = '0.5'
-    dragImage.style.width = `${e.currentTarget.offsetWidth}px`
-    dragImage.style.height = `${e.currentTarget.offsetHeight}px`
-    dragImage.style.left = '-1000px'
-    document.body.appendChild(dragImage)
-    
-    e.dataTransfer.setDragImage(dragImage, 20, 20)
-    
-    // Remove the temporary element after a delay
-    setTimeout(() => {
-      document.body.removeChild(dragImage)
-    }, 0)
-  }
-  
-  // Handle pose drag ending
-  const handlePoseDragEnd = () => {
-    setIsDragging(false)
-    setDraggedPose(null)
-    setDragSourcePhaseId(null)
-    setDragOverPhaseId(null)
-    setDragOverPoseId(null)
-    setIsDraggedOut(false)
-  }
-  
-  // Handle dragging a pose over another pose
-  const handlePoseDragOver = (e: React.DragEvent<HTMLDivElement>, poseId: string, phaseId: string) => {
-    e.preventDefault()
-    e.stopPropagation()
-    
-    if (draggedPose && draggedPose.id !== poseId) {
-      setDragOverPoseId(poseId)
-      setDragOverPhaseId(phaseId)
-    }
-  }
-  
-  // Handle dropping a pose
-  const handlePoseDrop = (e: React.DragEvent<HTMLDivElement>, targetPoseId: string, targetPhaseId: string) => {
-    e.preventDefault()
-    e.stopPropagation()
-    
-    const sourcePhaseId = e.dataTransfer.getData("sourcePhaseId")
-    const sourcePoseId = e.dataTransfer.getData("poseId")
-    
-    if (!sequence || !sourcePoseId || !sourcePhaseId) return
-    
-    // If dragging onto self, do nothing
-    if (sourcePoseId === targetPoseId && sourcePhaseId === targetPhaseId) {
-      handlePoseDragEnd()
-      return
-    }
-    
-    // Find source and target phases
-    const sourcePhase = sequence.phases.find(p => p.id === sourcePhaseId)
-    const targetPhase = sequence.phases.find(p => p.id === targetPhaseId)
-    
-    if (!sourcePhase || !targetPhase) {
-      handlePoseDragEnd()
-      return
-    }
-    
-    // Find source pose
-    const sourcePose = sourcePhase.poses.find(p => p.id === sourcePoseId)
-    if (!sourcePose) {
-      handlePoseDragEnd()
-      return
-    }
-    
-    // Clone sequence to make changes
-    const updatedSequence = JSON.parse(JSON.stringify(sequence)) as Sequence
-    
-    // Remove pose from source phase
-    const updatedSourcePhase = updatedSequence.phases.find(p => p.id === sourcePhaseId)
-    if (updatedSourcePhase) {
-      updatedSourcePhase.poses = updatedSourcePhase.poses.filter(p => p.id !== sourcePoseId)
-    }
-    
-    // Add pose to target phase
-    const updatedTargetPhase = updatedSequence.phases.find(p => p.id === targetPhaseId)
-    if (updatedTargetPhase) {
-      // Find target pose index
-      const targetIndex = updatedTargetPhase.poses.findIndex(p => p.id === targetPoseId)
-      
-      // Insert at the right position
-      if (targetIndex !== -1) {
-        // Create a copy of the pose
-        const newPose = { ...sourcePose }
-        updatedTargetPhase.poses.splice(targetIndex + 1, 0, newPose)
-      } else {
-        // If target pose not found (should not happen), append to the end
-        updatedTargetPhase.poses.push({ ...sourcePose })
-      }
-    }
-    
-    // Update position values for all poses in affected phases
-    updatedSequence.phases.forEach(phase => {
-      phase.poses.forEach((pose, index) => {
-        pose.position = index + 1
-      })
-    })
-    
-    // Update the sequence and history
-    setSequence(updatedSequence)
-    saveToHistory(
-      updatedSequence, 
-      sourcePhaseId === targetPhaseId
-        ? `Reordered "${sourcePose.name}" in ${sourcePhase.name}`
-        : `Moved "${sourcePose.name}" from ${sourcePhase.name} to ${targetPhase.name}`
-    )
-    
-    // Reset drag state
-    handlePoseDragEnd()
-  }
-  
-  // Handler for drag leave
-  const handlePoseDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.stopPropagation()
-    
-    // Don't reset if we're dragging into a child element
-    if (e.currentTarget.contains(e.relatedTarget as Node)) return
-    
-    setDragOverPoseId(null)
-  }
-
-  // Update the existing handleDrop function to work with reordering
   const handleDrop = (e: React.DragEvent<HTMLDivElement>, phaseId: string) => {
     e.preventDefault()
     e.stopPropagation()
     setDragOverPhaseId(null)
 
     try {
-      // Check if this is a pose from the sidebar (external drop)
-      const poseDataString = e.dataTransfer.getData("pose")
+      const poseData = JSON.parse(e.dataTransfer.getData("pose")) as PoseData
+      if (!sequence) return
       
-      if (poseDataString) {
-        // Handle dropping a new pose from the sidebar
-        const poseData = JSON.parse(poseDataString) as PoseData
-        if (!sequence) return
-        
-        // Find the phase name
-        const targetPhase = sequence.phases.find(phase => phase.id === phaseId);
-        const phaseName = targetPhase ? targetPhase.name : "phase";
+      // Find the phase name
+      const targetPhase = sequence.phases.find(phase => phase.id === phaseId);
+      const phaseName = targetPhase ? targetPhase.name : "phase";
 
-        const updatedPhases = sequence.phases.map((phase: SequencePhase) => {
-          if (phase.id === phaseId) {
-            const newPose: SequencePose = {
-              id: `${poseData.id}-${Date.now()}`,
-              pose_id: poseData.id,
-              name: poseData.name,
-              sanskrit_name: poseData.sanskrit_name || undefined,
-              duration_seconds: 30,
-              position: phase.poses.length + 1,
-              side: poseData.side_option ? "left" : null
-            }
-            
-            return {
-              ...phase,
-              poses: [...phase.poses, newPose]
-            }
+      const updatedPhases = sequence.phases.map((phase: SequencePhase) => {
+        if (phase.id === phaseId) {
+          const newPose: SequencePose = {
+            id: `${poseData.id}-${Date.now()}`,
+            pose_id: poseData.id,
+            name: poseData.name,
+            sanskrit_name: poseData.sanskrit_name || undefined,
+            duration_seconds: 30,
+            position: phase.poses.length + 1,
+            side: poseData.side_option ? "left" : null
           }
-          return phase
-        })
+          
+          return {
+            ...phase,
+            poses: [...phase.poses, newPose]
+          }
+        }
+        return phase
+      })
 
-        const updatedSequence = {
-          ...sequence,
-          phases: updatedPhases
-        }
-        
-        setSequence(updatedSequence)
-        saveToHistory(updatedSequence, `Dropped "${poseData.name}" into ${phaseName}`)
-        return
+      const updatedSequence = {
+        ...sequence,
+        phases: updatedPhases
       }
       
-      // Check if this is an internal drag (reordering)
-      const sourcePoseId = e.dataTransfer.getData("poseId")
-      const sourcePhaseId = e.dataTransfer.getData("sourcePhaseId")
-      
-      if (sourcePoseId && sourcePhaseId && sequence) {
-        // Handle internal drag when dropped on a phase (append to end)
-        // Find source phase and pose
-        const sourcePhase = sequence.phases.find(p => p.id === sourcePhaseId)
-        if (!sourcePhase) return
-        
-        const sourcePose = sourcePhase.poses.find(p => p.id === sourcePoseId)
-        if (!sourcePose) return
-        
-        // Target phase (where we're dropping)
-        const targetPhase = sequence.phases.find(p => p.id === phaseId)
-        if (!targetPhase) return
-        
-        // Clone sequence to make changes
-        const updatedSequence = JSON.parse(JSON.stringify(sequence)) as Sequence
-        
-        // Remove pose from source phase
-        const updatedSourcePhase = updatedSequence.phases.find(p => p.id === sourcePhaseId)
-        if (updatedSourcePhase) {
-          updatedSourcePhase.poses = updatedSourcePhase.poses.filter(p => p.id !== sourcePoseId)
-        }
-        
-        // Add pose to target phase at the end
-        const updatedTargetPhase = updatedSequence.phases.find(p => p.id === phaseId)
-        if (updatedTargetPhase) {
-          updatedTargetPhase.poses.push({ ...sourcePose })
-        }
-        
-        // Update position values for all poses in affected phases
-        updatedSequence.phases.forEach(phase => {
-          phase.poses.forEach((pose, index) => {
-            pose.position = index + 1
-          })
-        })
-        
-        // Update the sequence and history
-        setSequence(updatedSequence)
-        saveToHistory(
-          updatedSequence, 
-          sourcePhaseId === phaseId
-            ? `Reordered "${sourcePose.name}" in ${sourcePhase.name}`
-            : `Moved "${sourcePose.name}" from ${sourcePhase.name} to ${targetPhase.name}`
-        )
-      }
+      setSequence(updatedSequence)
+      saveToHistory(updatedSequence, `Dropped "${poseData.name}" into ${phaseName}`)
     } catch (error) {
       console.error("Error handling pose drop:", error)
     }
-    
-    // Reset drag state
-    handlePoseDragEnd()
   }
 
   const handlePoseSelect = (poseData: PoseData) => {
@@ -905,7 +704,7 @@ export default function SequenceEditorPage() {
             if (localSequence) {
               console.log(`Client: Found sequence in localStorage: ${sequenceId}`);
               
-              // Immediately expand all phases when displaying structure
+              // Always expand all phases when displaying sequences
               let phasesToExpand: string[] = [];
               if (localSequence.phases && localSequence.phases.length > 0) {
                 phasesToExpand = localSequence.phases.map((phase: any) => phase.id);
@@ -927,10 +726,8 @@ export default function SequenceEditorPage() {
                 setSequence(localSequence);
                 setIsPosesLoading(false);
                 
-                // Just expand the first phase for complete sequences
-                if (localSequence.phases && localSequence.phases.length > 0) {
-                  setExpandedPhases([localSequence.phases[0].id]);
-                }
+                // Expand all phases for complete sequences too
+                setExpandedPhases(phasesToExpand);
               }
               
               setIsLoading(false);
@@ -1023,6 +820,11 @@ export default function SequenceEditorPage() {
               // Update state
               setSequence(data);
               setIsPosesLoading(false);
+              
+              // Keep all phases expanded after poses are loaded
+              if (data.phases && data.phases.length > 0) {
+                setExpandedPhases(data.phases.map((phase: SequencePhase) => phase.id));
+              }
               
               showToast("Sequence with poses generated successfully!", "success");
             }
@@ -1538,21 +1340,34 @@ export default function SequenceEditorPage() {
                       ) : (
                         // Show actual poses when loaded
                         phase.poses.map((pose, index) => (
-                          <div
+                          <motion.div
                             key={pose.id}
+                            layoutId={pose.id}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ 
+                              type: "spring", 
+                              stiffness: 500, 
+                              damping: 30,
+                              delay: index * 0.05 
+                            }}
                             className={cn(
                               "bg-warm-white dark:bg-deep-charcoal-light rounded-lg shadow-sm overflow-hidden w-full",
-                              isDragging && draggedPose?.id === pose.id ? "opacity-50" : "",
-                              dragOverPoseId === pose.id ? "border-2 border-vibrant-blue" : "",
+                              isDragging && draggedPose?.id === pose.id ? "border-2 border-vibrant-blue" : "",
                               pose.side === "left" ? "border-l-4 border-l-blue-400" : "",
                               pose.side === "right" ? "border-r-4 border-r-purple-400" : ""
                             )}
-                            draggable={true}
-                            onDragStart={(e) => handlePoseDragStart(e, pose, phase.id)}
-                            onDragEnd={handlePoseDragEnd}
-                            onDragOver={(e) => handlePoseDragOver(e, pose.id, phase.id)}
-                            onDragLeave={handlePoseDragLeave}
-                            onDrop={(e) => handlePoseDrop(e, pose.id, phase.id)}
+                            drag="y"
+                            dragConstraints={{ top: 0, bottom: 0 }}
+                            dragElastic={0.1}
+                            onDragStart={() => {
+                              setIsDragging(true)
+                              setDraggedPose(pose)
+                            }}
+                            onDragEnd={() => {
+                              setIsDragging(false)
+                              setDraggedPose(null)
+                            }}
                           >
                             <div className="flex items-stretch">
                               {/* Drag Handle */}
@@ -1617,60 +1432,39 @@ export default function SequenceEditorPage() {
                                 </div>
                                 
                                 {/* Duration Selector */}
-                                <div className="flex items-center space-x-2">
-                                  <div className="flex items-center rounded-md overflow-hidden border dark:border-gray-700">
-                                    <button
-                                      className="px-2 py-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                                      onClick={() => handleDurationChange(pose.id, Math.max(5, (pose.duration_seconds || 30) - 5))}
-                                    >
-                                      −
-                                    </button>
-                                    <span className="px-2 py-1 min-w-[50px] text-center">
-                                      {pose.duration_seconds || 30}s
-                                    </span>
-                                    <button
-                                      className="px-2 py-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                                      onClick={() => handleDurationChange(pose.id, (pose.duration_seconds || 30) + 5)}
-                                    >
-                                      +
-                                    </button>
+                                <div className="flex items-center space-x-3">
+                                  <button 
+                                    onClick={() => handleDurationChange(pose.id, Math.max(5, pose.duration_seconds - 5))}
+                                    className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                      <path fillRule="evenodd" d="M5 10a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z" clipRule="evenodd" />
+                                    </svg>
+                                  </button>
+                                  
+                                  <div className="w-16 text-center font-medium">
+                                    {Math.floor(pose.duration_seconds / 60)}:{(pose.duration_seconds % 60).toString().padStart(2, '0')}
                                   </div>
                                   
-                                  <button
-                                    className="px-2 py-1 text-xs bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
-                                    onClick={() => {
-                                      // Remove pose functionality
-                                      if (window.confirm(`Remove ${pose.name} from sequence?`)) {
-                                        const updatedPhases = sequence!.phases.map(p => ({
-                                          ...p,
-                                          poses: p.id === phase.id 
-                                            ? p.poses.filter(p => p.id !== pose.id)
-                                            : p.poses
-                                        }))
-                                        
-                                        const updatedSequence = {
-                                          ...sequence!,
-                                          phases: updatedPhases
-                                        }
-                                        
-                                        setSequence(updatedSequence)
-                                        saveToHistory(updatedSequence, `Removed "${pose.name}" from ${phase.name}`)
-                                      }
-                                    }}
+                                  <button 
+                                    onClick={() => handleDurationChange(pose.id, pose.duration_seconds + 5)}
+                                    className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
                                   >
-                                    Remove
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                      <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+                                    </svg>
                                   </button>
                                 </div>
                               </div>
                             </div>
-                          </div>
+                          </motion.div>
                         ))
                       )}
                     </div>
-                  )}
-                </div>
-              ))}
-            </div>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       </main>
