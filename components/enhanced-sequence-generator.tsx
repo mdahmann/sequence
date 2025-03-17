@@ -126,7 +126,7 @@ export function EnhancedSequenceGenerator() {
             },
             {
               label: "Sign Up",
-              onClick: () => router.push("/register")
+              onClick: () => router.push("/signup")
             }
           ]
         );

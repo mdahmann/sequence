@@ -168,7 +168,7 @@ export function EnhancedToastProvider({ children }: EnhancedToastProviderProps) 
                       className={`px-4 py-2 rounded-md font-medium transition-colors ${
                         index === 0 
                           ? "bg-white text-vibrant-blue hover:bg-gray-100" 
-                          : "bg-white/20 text-white hover:bg-white/30"
+                          : "bg-transparent border border-white text-white hover:bg-white/10"
                       }`}
                     >
                       {action.label}
