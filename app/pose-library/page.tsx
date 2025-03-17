@@ -4,10 +4,14 @@ import type { Pose } from "@/types/pose"
 import { PageContainer } from "@/components/page-container"
 
 export default async function PoseLibraryPage() {
-  const supabase = createServerSupabaseClient()
+  // Get the supabase client with the async function
+  const supabase = await createServerSupabaseClient()
 
   // Fetch all poses
   const { data: poses } = await supabase.from("poses").select("*").order("english_name", { ascending: true })
+  
+  // We need to handle the case where poses might be null
+  const posesArray: Pose[] = poses || [];
 
   return (
     <PageContainer>
@@ -16,7 +20,7 @@ export default async function PoseLibraryPage() {
         Explore our collection of yoga poses to create your perfect sequence.
       </p>
 
-      <PoseLibrary initialPoses={(poses as Pose[]) || []} />
+      <PoseLibrary initialPoses={posesArray} />
     </PageContainer>
   )
 }
