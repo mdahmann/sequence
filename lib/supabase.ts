@@ -4,11 +4,14 @@ import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
 import type { Database } from "@/types/supabase"
 
 // Create a Supabase client for server-side use
-export function createServerSupabaseClient() {
+export async function createServerSupabaseClient() {
   try {
+    // Get the cookie store first to avoid the async warning
+    const cookieStore = cookies()
+    
     // Create server component client with cookie handling
     return createServerComponentClient<Database>({
-      cookies,
+      cookies: () => cookieStore
     })
   } catch (error) {
     console.error("Failed to create server component client:", error)

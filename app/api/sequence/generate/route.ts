@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { serverSequenceService } from "@/lib/services/server-sequence-service"
 import { createServerClient } from '@supabase/ssr'
+import { cookies } from "next/headers"
 
 // Schema for sequence parameters validation
 const sequenceParamsSchema = z.object({
@@ -28,17 +29,14 @@ export async function POST(req: NextRequest) {
   }
   
   try {
-    // Create a Supabase client using cookies from the request
-    const cookieStore = req.cookies
-    console.log("Available cookies:", cookieStore.getAll().map(c => `${c.name}=${c.value.substring(0,10)}...`).join(', '))
-    
+    // Create a Supabase client using request cookies directly
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
           get(name: string) {
-            return cookieStore.get(name)?.value
+            return req.cookies.get(name)?.value
           },
           set(name: string, value: string, options: any) {
             // This is unused in the API route but required by the type

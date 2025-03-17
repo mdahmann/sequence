@@ -26,7 +26,7 @@ export const serverSequenceService = {
     })
     
     // Create a server-side Supabase client
-    const supabase = createServerSupabaseClient()
+    const supabase = await createServerSupabaseClient()
     
     try {
       // Fetch all poses from the database without requiring authentication
