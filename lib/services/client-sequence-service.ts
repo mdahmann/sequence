@@ -11,11 +11,14 @@ export interface APIError {
 export const clientSequenceService = {
   async generateSequence(params: SequenceParams): Promise<Sequence> {
     try {
+      console.log("Making API request to generate sequence:", params);
+      
       const response = await fetch('/api/sequence/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Include authentication cookies
         body: JSON.stringify(params),
       })
 
