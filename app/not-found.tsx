@@ -1,7 +1,9 @@
 import Link from 'next/link'
 import { PageContainer } from '@/components/page-container'
 import { Button } from "@/components/ui/button"
-import { Sparkles } from "lucide-react"
+
+// Add export const dynamic = 'force-static' to prevent any dynamic behavior
+export const dynamic = 'force-static'
 
 export default function NotFound() {
   return (
