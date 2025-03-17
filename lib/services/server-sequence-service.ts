@@ -259,29 +259,32 @@ export const serverSequenceService = {
   }
 }
 
-// Helper function to parse duration string to seconds
-function parseDuration(duration?: string): number {
+// Helper function to parse duration
+function parseDuration(duration: string): number {
   if (!duration) return 30; // Default to 30 seconds
   
-  // Check if it's a number of breaths
-  const breathsMatch = duration.match(/(\d+)\s*breath/i);
-  if (breathsMatch) {
-    // Assume each breath is about 5 seconds
-    return parseInt(breathsMatch[1]) * 5;
+  // If it's just a number, assume it's seconds
+  if (!isNaN(Number(duration))) {
+    return Number(duration);
   }
   
-  // Check if it's seconds
-  const secondsMatch = duration.match(/(\d+)\s*sec/i);
-  if (secondsMatch) {
-    return parseInt(secondsMatch[1]);
+  // Try to extract numbers from strings like "5 breaths" or "30 seconds"
+  const match = duration.match(/(\d+)/);
+  if (match && match[1]) {
+    const value = Number(match[1]);
+    
+    // Convert breaths to seconds (assume 5 seconds per breath)
+    if (duration.toLowerCase().includes('breath')) {
+      return value * 5;
+    }
+    
+    // For seconds, minutes, etc.
+    if (duration.toLowerCase().includes('minute') || duration.toLowerCase().includes('min')) {
+      return value * 60;
+    }
+    
+    return value; // Assume seconds for anything else with numbers
   }
   
-  // Try to just parse a number
-  const numberMatch = duration.match(/(\d+)/);
-  if (numberMatch) {
-    return parseInt(numberMatch[1]);
-  }
-  
-  // Default
-  return 30;
+  return 30; // Default fallback
 } 

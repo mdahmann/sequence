@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { serverSequenceService } from "@/lib/services/server-sequence-service"
 import { createServerSupabaseClient } from "@/lib/supabase"
+import { generateSequence as generateAISequence } from "@/app/api/generate-sequence/handler"
 
 // Schema for sequence parameters validation
 const sequenceParamsSchema = z.object({
@@ -13,61 +14,40 @@ const sequenceParamsSchema = z.object({
 })
 
 export async function POST(req: NextRequest) {
-  console.log("Starting POST request to /api/sequence/generate")
+  console.log("Starting POST /api/sequence/generate")
   
   try {
-    // Parse and validate request body
-    const body = await req.json()
-    const validatedParams = sequenceParamsSchema.safeParse(body)
+    // Parse the request body
+    const requestBody = await req.json()
+    console.log("Validating sequence parameters")
+    
+    // Validate the request parameters using Zod
+    const validatedParams = sequenceParamsSchema.safeParse(requestBody)
     
     if (!validatedParams.success) {
-      console.log("API route: Invalid parameters - returning 400")
-      return NextResponse.json(
-        { error: "Invalid parameters", details: validatedParams.error.format() },
-        { status: 400 }
-      )
+      const errorMessage = validatedParams.error.issues
+        .map((issue) => `${issue.path}: ${issue.message}`)
+        .join(", ")
+      
+      console.error(`Invalid sequence parameters: ${errorMessage}`)
+      return NextResponse.json({ error: errorMessage }, { status: 400 })
     }
     
-    // Generate sequence - no auth check for now
-    console.log("API route: Generating sequence without auth check...")
+    console.log("Parameters validated successfully, generating sequence")
+
+    // Call the sequence generation service
     const sequence = await serverSequenceService.generateSequence(validatedParams.data)
     
-    // Return generated sequence
-    console.log("API route: Sequence generated successfully - returning 201")
-    return NextResponse.json({ sequence }, { status: 201 })
+    console.log("Sequence generated successfully")
+    
+    // Return the generated sequence
+    return NextResponse.json(sequence, { status: 201 })
   } catch (error: any) {
-    console.error("API route error:", error.message)
+    console.error("Error generating sequence:", error)
     
-    // Handle specific error types
-    if (error.message === "UNAUTHENTICATED_USER" || error.message.includes("UNAUTHENTICATED_USER")) {
-      console.log("API route: Authentication error from service - returning 401")
-      return NextResponse.json(
-        { 
-          error: "Authentication required", 
-          message: "Please sign in or create an account to generate sequences." 
-        },
-        { status: 401 }
-      )
-    }
-    
-    if (error.message === "USER_NOT_FOUND" || error.message.includes("USER_NOT_FOUND")) {
-      console.log("API route: User not found error - returning 403")
-      return NextResponse.json(
-        { 
-          error: "User account issue", 
-          message: "Your user account is not properly set up. Please contact support." 
-        },
-        { status: 403 }
-      )
-    }
-    
-    // Generic error handling
-    console.log("API route: Generic error - returning 500")
+    // Return a 500 error
     return NextResponse.json(
-      { 
-        error: "Sequence generation failed", 
-        message: error.message || "An unexpected error occurred" 
-      },
+      { error: `Error generating sequence: ${error.message}` },
       { status: 500 }
     )
   }
