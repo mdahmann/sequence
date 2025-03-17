@@ -792,7 +792,9 @@ export default function SequenceEditorPage() {
               sequenceId: sequence.id,
               difficulty: sequence.difficulty,
               style: sequence.style,
-              focus: sequence.focus
+              focus: sequence.focus,
+              // Send the entire structure for the server to use
+              structure: sequence
             })
           });
           

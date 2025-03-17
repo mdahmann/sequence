@@ -129,12 +129,56 @@ export const serverSequenceService = {
           // Process poses to normalize naming
           const processedPoses = this.processPoses(poses);
           
-          // Step 1: Generate the sequence structure
+          // Step 1: Generate the sequence structure only
+          // IMPORTANT: We are ONLY generating the structure here, not poses
           const structure = await this.generateSequenceStructure(params);
           console.log("Generated sequence structure:", structure.name);
           
-          // Step 2: Fill in the sequence with specific poses
-          return await this.fillSequenceWithPoses(structure, params, processedPoses);
+          // Convert structure to sequence without poses
+          const now = new Date().toISOString();
+          const sequenceId = uuidv4();
+          
+          // Create a sequence from just the structure
+          const sequence: Sequence = {
+            id: sequenceId,
+            name: structure.name,
+            description: structure.description,
+            duration_minutes: params.duration,
+            difficulty: params.difficulty,
+            style: params.style,
+            focus: params.focus,
+            phases: structure.segments.map(segment => {
+              // Create a phase for each segment
+              const phase: SequencePhase = {
+                id: uuidv4(),
+                name: segment.name,
+                description: segment.description,
+                poses: [] // Initially empty, will be populated later
+              };
+              
+              // For UI display purposes, add placeholder poses
+              const placeholderCount = Math.ceil(segment.durationMinutes / 2);
+              for (let i = 0; i < placeholderCount; i++) {
+                phase.poses.push({
+                  id: `placeholder-${uuidv4()}`,
+                  pose_id: "placeholder",
+                  name: "__loading__", // Special marker for UI to know this is a placeholder
+                  duration_seconds: 30,
+                  position: i + 1
+                });
+              }
+              
+              return phase;
+            }),
+            created_at: now,
+            updated_at: now,
+            is_favorite: false,
+            notes: structure.intention || params.additionalNotes || "",
+            structureOnly: true // Mark this as structure-only for the UI
+          };
+          
+          // Return just the structure - don't generate poses yet
+          return sequence;
         } catch (aiError) {
           console.error("serverSequenceService: Error with OpenAI, falling back to basic generation:", aiError)
           // Fall back to basic generation if OpenAI fails
