@@ -18,7 +18,7 @@
 
 ## Style-Specific Guidelines
 
-### Vinyasa Flow
+### Vinyasa
 - Breath-synchronized movement
 - Sun salutations as foundational sequences
 - Dynamic transitions

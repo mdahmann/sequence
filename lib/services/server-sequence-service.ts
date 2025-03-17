@@ -6,13 +6,89 @@ import {
   Sequence, 
   SequencePhase, 
   SequencePose,
-  SequenceParams
+  SequenceParams,
+  SequenceStructure,
+  SequenceSegment
 } from '@/types/sequence'
+import { getYogaGuidelines } from '@/lib/server-utils'
 
 // Create an OpenAI instance if the API key is available
 const openai = process.env.OPENAI_API_KEY 
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
+
+// Define JSON schemas for OpenAI function calling
+const sequenceStructureSchema = {
+  type: "object",
+  properties: {
+    name: { type: "string" },
+    description: { type: "string" },
+    intention: { type: "string" },
+    segments: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          description: { type: "string" },
+          durationMinutes: { type: "number" },
+          intensityLevel: { type: "number" },
+          poseTypes: { 
+            type: "array", 
+            items: { type: "string" } 
+          },
+          purpose: { type: "string" }
+        },
+        required: ["name", "description", "durationMinutes", "intensityLevel", "poseTypes", "purpose"]
+      }
+    }
+  },
+  required: ["name", "description", "intention", "segments"]
+};
+
+// Schema for filled sequence with poses
+const filledSequenceSchema = {
+  type: "object",
+  properties: {
+    name: { type: "string" },
+    description: { type: "string" },
+    phases: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          description: { type: "string" },
+          poses: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                name: { type: "string" },
+                description: { type: "string" },
+                duration_seconds: { type: "number" },
+                side: { type: "string", enum: ["left", "right", "both", null] },
+                transition: { type: "string" },
+                cues: { 
+                  type: "array", 
+                  items: { type: "string" } 
+                },
+                breath_cue: { type: "string" },
+                modifications: {
+                  type: "array",
+                  items: { type: "string" }
+                }
+              },
+              required: ["name", "duration_seconds"]
+            }
+          }
+        },
+        required: ["name", "description", "poses"]
+      }
+    }
+  },
+  required: ["name", "description", "phases"]
+};
 
 export const serverSequenceService = {
   async generateSequence(params: SequenceParams): Promise<Sequence> {
@@ -45,7 +121,15 @@ export const serverSequenceService = {
       if (openai && process.env.OPENAI_API_KEY) {
         try {
           console.log("serverSequenceService: Attempting to use OpenAI for sequence generation")
-          return await this.generateWithOpenAI(params, poses);
+          // Process poses to normalize naming
+          const processedPoses = this.processPoses(poses);
+          
+          // Step 1: Generate the sequence structure
+          const structure = await this.generateSequenceStructure(params);
+          console.log("Generated sequence structure:", structure.name);
+          
+          // Step 2: Fill in the sequence with specific poses
+          return await this.fillSequenceWithPoses(structure, params, processedPoses);
         } catch (aiError) {
           console.error("serverSequenceService: Error with OpenAI, falling back to basic generation:", aiError)
           // Fall back to basic generation if OpenAI fails
@@ -61,85 +145,216 @@ export const serverSequenceService = {
     }
   },
   
-  // Generate a sequence using OpenAI
-  async generateWithOpenAI(params: SequenceParams, poses: any[]): Promise<Sequence> {
-    if (!openai) {
-      throw new Error("OpenAI client not initialized");
-    }
-    
-    // First, prepare the poses data to make it easier to match
-    // In the database, poses have english_name, but we need to match by name for OpenAI
-    const processedPoses = poses.map(pose => ({
+  // Process and normalize pose data
+  processPoses(poses: any[]): any[] {
+    return poses.map(pose => ({
       ...pose,
       // Ensure each pose has a name property that matches english_name for easier matching
       name: pose.english_name || pose.name || 'Unknown Pose'
     }));
+  },
+  
+  // Step 1: Generate the sequence structure
+  async generateSequenceStructure(params: SequenceParams): Promise<SequenceStructure> {
+    if (!openai) {
+      throw new Error("OpenAI client not initialized");
+    }
     
-    // Create a list of pose names for the prompt
-    const poseNames = processedPoses.map(pose => pose.name).join(", ");
+    // Get yoga guidelines content
+    const yogaGuidelines = await this.getYogaGuidelines(params.style, params.focus, params.difficulty);
     
-    // Prepare the prompt for OpenAI
-    const prompt = this.buildPrompt(params, processedPoses);
+    // Build the structure prompt
+    const structurePrompt = `
+      As an experienced yoga teacher, create a ${params.style} yoga class structure for a ${params.duration}-minute ${params.difficulty} class focusing on ${params.focus}.
+      ${params.peakPose ? `This sequence should build toward ${params.peakPose.name} as the peak pose.` : ''}
+      ${params.additionalNotes ? `Additional requirements: ${params.additionalNotes}` : ''}
+      
+      Create a cohesive yoga practice with:
+      1. Class title that captures the essence of the practice
+      2. Brief overall intention/theme
+      3. 4-7 logical practice segments (avoid just "warm-up, main, cool down")
+      4. For each segment include:
+         - Name (use authentic yoga terminology)
+         - Duration in minutes (total should equal ${params.duration})
+         - Purpose/focus of this segment
+         - General pose types to include (not specific poses)
+         - Intensity level (1-10)
+      
+      YOGA STYLE GUIDELINES:
+      ${yogaGuidelines}
+    `;
     
-    // Call OpenAI API to generate a sequence
-    console.log("serverSequenceService: Calling OpenAI API");
+    console.log("serverSequenceService: Calling OpenAI API for sequence structure");
+    
+    // Call OpenAI with function calling to get a structured response
     const completion = await openai.chat.completions.create({
       model: "gpt-4-turbo",
       temperature: 0.7,
       messages: [
         {
           role: "system",
-          content: "You are a professional yoga instructor tasked with creating appropriate yoga sequences based on user preferences. You will ONLY use poses from the provided database."
+          content: "You are an expert yoga teacher designing authentic, safe sequences following traditional yoga principles."
         },
         {
           role: "user",
-          content: prompt
+          content: structurePrompt
         }
       ],
-      response_format: { type: "json_object" }
+      functions: [{ name: "generateStructure", parameters: sequenceStructureSchema }],
+      function_call: { name: "generateStructure" }
     });
     
     // Parse the response
-    console.log("serverSequenceService: Received response from OpenAI");
-    const responseContent = completion.choices[0].message.content;
-    
-    if (!responseContent) {
-      throw new Error("Empty response from OpenAI");
+    const functionCall = completion.choices[0].message.function_call;
+    if (!functionCall || !functionCall.arguments) {
+      throw new Error("Failed to generate sequence structure");
     }
     
-    // Parse the JSON response
-    let generatedSequence: any;
     try {
-      generatedSequence = JSON.parse(responseContent);
-      console.log("serverSequenceService: Successfully parsed OpenAI response");
+      const structure: SequenceStructure = JSON.parse(functionCall.arguments);
+      console.log("serverSequenceService: Successfully generated sequence structure");
+      
+      // Ensure total duration matches requested duration
+      const totalDuration = structure.segments.reduce((sum, segment) => sum + segment.durationMinutes, 0);
+      if (totalDuration !== params.duration) {
+        // Adjust durations proportionally
+        const ratio = params.duration / totalDuration;
+        structure.segments = structure.segments.map(segment => ({
+          ...segment,
+          durationMinutes: Math.round(segment.durationMinutes * ratio)
+        }));
+      }
+      
+      return structure;
     } catch (error) {
-      console.error("serverSequenceService: Error parsing OpenAI response:", error);
-      console.log("serverSequenceService: Raw response:", responseContent);
-      throw new Error("Failed to parse OpenAI response");
+      console.error("serverSequenceService: Error parsing structure:", error);
+      throw new Error("Failed to parse sequence structure");
+    }
+  },
+  
+  // Step 2: Fill the structure with specific poses
+  async fillSequenceWithPoses(
+    structure: SequenceStructure, 
+    params: SequenceParams, 
+    poses: any[]
+  ): Promise<Sequence> {
+    if (!openai) {
+      throw new Error("OpenAI client not initialized");
     }
     
+    // Organize poses by category for more efficient selection
+    const organizedPoses = this.organizePosesByCategory(poses);
+    
+    // Get pose names list - only send relevant poses for token efficiency
+    const poseNames = poses.map(pose => pose.name).join(", ");
+    
+    // Build the prompt for filling in poses
+    const fillPosesPrompt = `
+      Fill in specific poses for this ${params.style} yoga sequence structure:
+      ${JSON.stringify(structure, null, 2)}
+      
+      For each segment, select appropriate poses that:
+      1. Match the segment's purpose and intensity level
+      2. Create logical transitions between poses
+      3. Follow proper alignment principles
+      4. Include appropriate breath guidance
+      5. Match the ${params.difficulty} level
+      
+      IMPORTANT RULES:
+      1. ONLY use poses from this list: ${poseNames}
+      2. Each segment should have an appropriate number of poses based on duration and style
+      3. For vinyasa, use more poses with shorter holds; for yin/restorative, use fewer poses with longer holds
+      4. For each pose include:
+         - name (must exactly match a name from the provided list)
+         - duration_seconds (how long to hold the pose)
+         - side (if applicable, either "left", "right", "both", or null)
+         - transition (brief instruction on how to move to this pose)
+         - cues (array of alignment and breath cues)
+      5. Bilateral poses should be repeated on both sides, sequentially
+      ${params.peakPose ? `6. Include the peak pose "${params.peakPose.name}" at an appropriate point in the sequence with proper preparation and counter poses` : ''}
+    `;
+    
+    console.log("serverSequenceService: Calling OpenAI API to fill sequence with poses");
+    
+    // Call OpenAI with function calling to get a structured response with poses
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4-turbo", 
+      temperature: 0.7,
+      messages: [
+        {
+          role: "system",
+          content: "You are an expert yoga teacher creating detailed pose sequences. Select appropriate poses for each segment of the class structure."
+        },
+        {
+          role: "user",
+          content: fillPosesPrompt
+        }
+      ],
+      functions: [{ name: "fillSequenceWithPoses", parameters: filledSequenceSchema }],
+      function_call: { name: "fillSequenceWithPoses" }
+    });
+    
+    // Parse the response
+    const functionCall = completion.choices[0].message.function_call;
+    if (!functionCall || !functionCall.arguments) {
+      throw new Error("Failed to fill sequence with poses");
+    }
+    
+    try {
+      // Parse the generated sequence with poses
+      const filledSequence = JSON.parse(functionCall.arguments);
+      console.log("serverSequenceService: Successfully filled sequence with poses");
+      
+      // Convert to our Sequence format
+      return this.convertToSequenceFormat(filledSequence, structure, params);
+    } catch (error) {
+      console.error("serverSequenceService: Error parsing filled sequence:", error);
+      throw new Error("Failed to parse filled sequence");
+    }
+  },
+  
+  // Helper method to organize poses by category
+  organizePosesByCategory(poses: any[]): Record<string, any[]> {
+    const organized: Record<string, any[]> = {};
+    
+    poses.forEach(pose => {
+      const category = pose.category || 'uncategorized';
+      if (!organized[category]) {
+        organized[category] = [];
+      }
+      organized[category].push(pose);
+    });
+    
+    return organized;
+  },
+  
+  // Convert the filled sequence to our Sequence format
+  convertToSequenceFormat(
+    filledSequence: any, 
+    structure: SequenceStructure, 
+    params: SequenceParams
+  ): Sequence {
     const now = new Date().toISOString();
     
-    // Create a properly formatted sequence object
+    // Create the sequence object
     const sequence: Sequence = {
       id: uuidv4(),
-      name: generatedSequence.name || `${params.duration} min ${params.difficulty} ${params.style} for ${params.focus}`,
-      description: generatedSequence.description || `A ${params.duration} minute ${params.difficulty} ${params.style} yoga sequence focusing on ${params.focus}.`,
+      name: filledSequence.name || structure.name,
+      description: filledSequence.description || structure.description,
       duration_minutes: params.duration,
       difficulty: params.difficulty,
       style: params.style,
       focus: params.focus,
-      notes: params.additionalNotes || "",
       phases: [],
       created_at: now,
       updated_at: now,
-      is_favorite: false
+      is_favorite: false,
+      notes: structure.intention || params.additionalNotes || "",
     };
     
-    // Process each phase from the generated sequence
-    if (Array.isArray(generatedSequence.phases)) {
-      // Map the generated phases to our Sequence type
-      sequence.phases = generatedSequence.phases.map((phase: any, phaseIndex: number) => {
+    // Process each phase/segment from the filled sequence
+    if (Array.isArray(filledSequence.phases)) {
+      sequence.phases = filledSequence.phases.map((phase: any, phaseIndex: number) => {
         const sequencePhase: SequencePhase = {
           id: uuidv4(),
           name: phase.name,
@@ -150,64 +365,35 @@ export const serverSequenceService = {
         // Map the poses in each phase
         if (Array.isArray(phase.poses)) {
           sequencePhase.poses = phase.poses.map((pose: any, poseIndex: number) => {
-            const poseName = pose.name?.toLowerCase();
-            if (!poseName) {
-              console.warn(`Pose missing name in OpenAI response:`, pose);
-              // Skip poses without names
-              return null;
-            }
-            
-            // Find the matching pose from our database - use english_name as the primary matcher
-            const matchingPose = processedPoses.find(
-              (dbPose) => {
-                const dbPoseName = dbPose.name?.toLowerCase();
-                return dbPoseName && dbPoseName === poseName;
-              }
-            );
-            
-            // If we couldn't find a matching pose, log a warning but continue with a placeholder
-            if (!matchingPose) {
-              console.warn(`No matching pose found for: ${pose.name}`);
-              // Create a placeholder pose
-              return {
-                id: uuidv4(),
-                pose_id: "unknown",
-                name: pose.name,
-                duration_seconds: pose.duration_seconds || 30,
-                side: pose.side || null,
-                cues: Array.isArray(pose.cues) ? pose.cues.join(", ") : (pose.cues || ""),
-                position: phaseIndex * 100 + poseIndex + 1,
-                sanskrit_name: undefined,
-                image_url: undefined
-              };
-            }
-            
-            // Create a sequence pose with data from both the OpenAI response and the database
+            // Create a sequence pose
             const sequencePose: SequencePose = {
               id: uuidv4(),
-              pose_id: matchingPose.id || "unknown",
+              pose_id: pose.id || "unknown", // This will be resolved later
               name: pose.name,
               duration_seconds: pose.duration_seconds || 30,
               side: pose.side || null,
               cues: Array.isArray(pose.cues) ? pose.cues.join(", ") : (pose.cues || ""),
               position: phaseIndex * 100 + poseIndex + 1,
-              sanskrit_name: matchingPose.sanskrit_name || undefined,
-              image_url: matchingPose.image_url || undefined
+              sanskrit_name: pose.sanskrit_name,
+              image_url: pose.image_url,
+              transition: pose.transition,
+              breath_cue: pose.breath_cue,
+              modifications: pose.modifications
             };
             
             return sequencePose;
-          }).filter(Boolean) as SequencePose[]; // Filter out any null poses
+          });
         }
         
         return sequencePhase;
       });
     }
     
-    console.log("serverSequenceService: Successfully generated AI sequence", sequence.name);
+    console.log("serverSequenceService: Successfully converted to sequence format");
     return sequence;
   },
   
-  // Generate a basic sequence without AI
+  // Generate a basic sequence without AI - keeping this as fallback
   generateBasicSequence(params: SequenceParams, poses: any[]): Sequence {
     console.log("serverSequenceService: Generating basic sequence");
     
@@ -331,159 +517,168 @@ export const serverSequenceService = {
     return sequence;
   },
   
-  buildPrompt(params: SequenceParams, poses: any[]): string {
-    // Create a list of available pose names to include in the prompt
-    const poseNames = poses.map(pose => pose.name || pose.english_name || "Unknown Pose").join(", ");
-    
-    // Add yoga guidelines based on style and focus
-    const yogaGuidelines = this.getYogaGuidelines(params.style, params.focus, params.difficulty);
-    
-    // Build peak pose instruction if provided
-    const peakPoseInstruction = params.peakPose 
-      ? `\n- Peak Pose: ${params.peakPose.name}${params.peakPose.sanskrit_name ? ` (${params.peakPose.sanskrit_name})` : ''}`
-      : '';
-    
-    return `
-    Create a yoga sequence with the following parameters:
-    - Duration: ${params.duration} minutes
-    - Difficulty: ${params.difficulty}
-    - Style: ${params.style}
-    - Focus Area: ${params.focus}${peakPoseInstruction}
-    - Additional Notes: ${params.additionalNotes || "None"}
-    
-    YOGA GUIDELINES:
-    ${yogaGuidelines}
-    ${params.peakPose ? `\nIMPORTANT: This sequence should build towards the peak pose "${params.peakPose.name}" in the Main Sequence phase. Include appropriate preparatory poses and counter poses.` : ''}
-    
-    IMPORTANT RULES:
-    1. ONLY use poses from this list: ${poseNames}
-    2. Create a sequence with exactly 3 phases: "Warm Up", "Main Sequence", and "Cool Down"
-    3. Each phase should have an appropriate duration that adds up to the total requested duration
-    4. Match the difficulty level requested
-    5. For each pose include:
-       - name (must exactly match a name from the provided list)
-       - duration_seconds (how long to hold the pose)
-       - side (if applicable, either "left", "right", or null)
-       - transition (brief instruction on how to move to this pose)
-       - description (short description of the pose)
-       - cues (array of alignment cues or breathing instructions)
-    ${params.peakPose ? `6. Include the peak pose "${params.peakPose.name}" in the Main Sequence phase, with proper preparation and counter poses` : ''}
-    
-    Return the sequence as a JSON object with this structure:
-    {
-      "name": "Name of the sequence",
-      "description": "Description of the sequence",
-      "phases": [
-        {
-          "name": "Warm Up",
-          "description": "Description of this phase",
-          "poses": [
-            {
-              "name": "Pose Name",
-              "description": "Description of this pose",
-              "duration_seconds": number,
-              "side": "left" | "right" | null,
-              "transition": "How to transition to this pose",
-              "cues": ["Cue 1", "Cue 2"]
-            },
-            ...more poses
-          ]
-        },
-        ...more phases
-      ]
+  // Get yoga guidelines based on style, focus and difficulty
+  async getYogaGuidelines(style: string, focus: string, difficulty: string): Promise<string> {
+    try {
+      // Try to get the guidelines from the markdown file
+      const fullGuidelines = await getYogaGuidelines();
+      
+      if (!fullGuidelines) {
+        // Fall back to hard-coded guidelines if file not found
+        return this.getFallbackGuidelines(style, focus, difficulty);
+      }
+      
+      // Extract relevant sections based on parameters
+      let relevantGuidelines = '';
+      
+      // Add general principles
+      const generalSection = fullGuidelines.split('## General Sequencing Principles')[1]?.split('##')[0];
+      if (generalSection) {
+        relevantGuidelines += generalSection;
+      }
+      
+      // Add duration-specific guidelines
+      const durationSection = fullGuidelines.match(/## Duration-Based Sequencing([\s\S]*?)(?=##)/)?.[1];
+      if (durationSection) {
+        relevantGuidelines += durationSection;
+      }
+      
+      // Add style-specific guidelines
+      const styleKey = style.charAt(0).toUpperCase() + style.slice(1);
+      const styleSection = fullGuidelines.match(new RegExp(`### ${styleKey}([\\s\\S]*?)(?=###|##)`))?.[1];
+      if (styleSection) {
+        relevantGuidelines += `Style-specific guidelines:\n${styleSection}\n`;
+      }
+      
+      // Add difficulty-specific guidelines
+      const difficultyKey = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+      const difficultySection = fullGuidelines.match(new RegExp(`### ${difficultyKey}([\\s\\S]*?)(?=###|##)`))?.[1];
+      if (difficultySection) {
+        relevantGuidelines += `Difficulty level considerations:\n${difficultySection}\n`;
+      }
+      
+      // Add focus-specific guidelines if not "full body"
+      if (focus !== "full body") {
+        // Convert focus to likely heading format
+        const focusMap: Record<string, string> = {
+          "upper body": "Hip Openers|Backbends|Inversions|Arm Balances",
+          "lower body": "Hip Openers|Forward Bends",
+          "core": "Core Strength",
+          "balance": "Balance",
+          "flexibility": "Forward Bends|Hip Openers"
+        };
+        
+        const focusPattern = focusMap[focus] || focus.replace(/ /g, ' ');
+        const focusRegex = new RegExp(`### (${focusPattern})([\\s\\S]*?)(?=###|##)`, 'i');
+        const focusSection = fullGuidelines.match(focusRegex)?.[2];
+        
+        if (focusSection) {
+          relevantGuidelines += `Focus area guidelines:\n${focusSection}\n`;
+        }
+      }
+      
+      // Clean up the extracted content
+      return relevantGuidelines
+        .replace(/^\s*[\r\n]/gm, '')  // Remove empty lines
+        .replace(/\n- /g, '\n• ')     // Convert hyphens to bullets
+        .trim();
+    } catch (error) {
+      console.error("Error getting yoga guidelines from file:", error);
+      // Fall back to hard-coded guidelines
+      return this.getFallbackGuidelines(style, focus, difficulty);
     }
-    `
   },
   
-  getYogaGuidelines(style: string, focus: string, difficulty: string): string {
+  // This is the original implementation as a fallback
+  getFallbackGuidelines(style: string, focus: string, difficulty: string): string {
     // Common principles
-    let guidelines = "- Sequence should flow naturally from one pose to the next\n";
-    guidelines += "- Balance seated, standing, and supine poses appropriately\n";
-    guidelines += "- Include counter-poses after deep or intense poses\n";
+    let guidelines = "• Sequence should flow naturally from one pose to the next\n";
+    guidelines += "• Balance seated, standing, and supine poses appropriately\n";
+    guidelines += "• Include counter-poses after deep or intense poses\n";
     
     // Style-specific guidelines
     switch (style) {
       case "vinyasa":
-        guidelines += "- Connect breath with movement (one breath, one movement)\n";
-        guidelines += "- Use sun salutations as linking sequences\n";
-        guidelines += "- Build momentum gradually and peak in the middle of the sequence\n";
+        guidelines += "• Connect breath with movement (one breath, one movement)\n";
+        guidelines += "• Use sun salutations as linking sequences\n";
+        guidelines += "• Build momentum gradually and peak in the middle of the sequence\n";
         break;
         
       case "hatha":
-        guidelines += "- Hold poses longer for deeper stretch and stability (45-90 seconds)\n";
-        guidelines += "- Focus on proper alignment and body awareness\n";
-        guidelines += "- Include plenty of time for proper adjustment in each pose\n";
+        guidelines += "• Hold poses longer for deeper stretch and stability (45-90 seconds)\n";
+        guidelines += "• Focus on proper alignment and body awareness\n";
+        guidelines += "• Include plenty of time for proper adjustment in each pose\n";
         break;
         
       case "yin":
-        guidelines += "- Hold poses for 2-5 minutes to target deep connective tissues\n";
-        guidelines += "- Focus on passive stretching rather than muscular engagement\n";
-        guidelines += "- Encourage use of props for support\n";
+        guidelines += "• Hold poses for 2-5 minutes to target deep connective tissues\n";
+        guidelines += "• Focus on passive stretching rather than muscular engagement\n";
+        guidelines += "• Encourage use of props for support\n";
         break;
         
       case "power":
-        guidelines += "- Include more dynamic and strength-building poses\n";
-        guidelines += "- Build heat through continuous movement\n";
-        guidelines += "- Add challenging variations of traditional poses\n";
+        guidelines += "• Include more dynamic and strength-building poses\n";
+        guidelines += "• Build heat through continuous movement\n";
+        guidelines += "• Add challenging variations of traditional poses\n";
         break;
         
       case "restorative":
-        guidelines += "- Include extensive use of props for complete support\n";
-        guidelines += "- Hold poses for 5-10 minutes to deeply relax the body\n";
-        guidelines += "- Focus on complete surrender and comfort in poses\n";
+        guidelines += "• Include extensive use of props for complete support\n";
+        guidelines += "• Hold poses for 5-10 minutes to deeply relax the body\n";
+        guidelines += "• Focus on complete surrender and comfort in poses\n";
         break;
     }
     
     // Focus area specific guidelines
     switch (focus) {
       case "full body":
-        guidelines += "- Include a balanced mix of standing, seated, and supine poses\n";
-        guidelines += "- Target all major muscle groups and joint movements\n";
+        guidelines += "• Include a balanced mix of standing, seated, and supine poses\n";
+        guidelines += "• Target all major muscle groups and joint movements\n";
         break;
         
       case "upper body":
-        guidelines += "- Emphasize shoulder openers, arm balances, and chest expansions\n";
-        guidelines += "- Include poses that strengthen arms, shoulders, and upper back\n";
+        guidelines += "• Emphasize shoulder openers, arm balances, and chest expansions\n";
+        guidelines += "• Include poses that strengthen arms, shoulders, and upper back\n";
         break;
         
       case "lower body":
-        guidelines += "- Focus on hip openers, hamstring stretches, and leg strengtheners\n";
-        guidelines += "- Include ankle mobility and foot stability exercises\n";
+        guidelines += "• Focus on hip openers, hamstring stretches, and leg strengtheners\n";
+        guidelines += "• Include ankle mobility and foot stability exercises\n";
         break;
         
       case "core":
-        guidelines += "- Incorporate poses that engage the deep core muscles\n";
-        guidelines += "- Balance between core strengthening and core stretching\n";
+        guidelines += "• Incorporate poses that engage the deep core muscles\n";
+        guidelines += "• Balance between core strengthening and core stretching\n";
         break;
         
       case "balance":
-        guidelines += "- Progress from stable to more challenging balance poses\n";
-        guidelines += "- Include preparatory poses that build required strength\n";
+        guidelines += "• Progress from stable to more challenging balance poses\n";
+        guidelines += "• Include preparatory poses that build required strength\n";
         break;
         
       case "flexibility":
-        guidelines += "- Hold stretches longer to increase flexibility\n";
-        guidelines += "- Warm up thoroughly before deep stretches\n";
+        guidelines += "• Hold stretches longer to increase flexibility\n";
+        guidelines += "• Warm up thoroughly before deep stretches\n";
         break;
     }
     
     // Difficulty level adjustments
     switch (difficulty) {
       case "beginner":
-        guidelines += "- Avoid complex transitions between poses\n";
-        guidelines += "- Include detailed alignment cues for safety\n";
-        guidelines += "- Favor basic poses with modifications\n";
+        guidelines += "• Avoid complex transitions between poses\n";
+        guidelines += "• Include detailed alignment cues for safety\n";
+        guidelines += "• Favor basic poses with modifications\n";
         break;
         
       case "intermediate":
-        guidelines += "- Include some challenging variations of basic poses\n";
-        guidelines += "- Include more complex transitions between poses\n";
+        guidelines += "• Include some challenging variations of basic poses\n";
+        guidelines += "• Include more complex transitions between poses\n";
         break;
         
       case "advanced":
-        guidelines += "- Include challenging pose variations and transitions\n";
-        guidelines += "- Longer holds or more dynamic movements\n";
-        guidelines += "- Create creative and unique sequences\n";
+        guidelines += "• Include challenging pose variations and transitions\n";
+        guidelines += "• Longer holds or more dynamic movements\n";
+        guidelines += "• Create creative and unique sequences\n";
         break;
     }
     

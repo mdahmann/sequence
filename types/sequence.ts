@@ -11,6 +11,24 @@ export interface SequenceParams {
   }
 }
 
+// New interface for the first step of sequence generation - the structure
+export interface SequenceStructure {
+  name: string
+  description: string
+  intention: string
+  segments: SequenceSegment[]
+}
+
+// More authentic terminology than "phase"
+export interface SequenceSegment {
+  name: string
+  description: string
+  durationMinutes: number
+  intensityLevel: number // 1-10
+  poseTypes: string[]
+  purpose: string
+}
+
 export interface SequencePose {
   id: string
   pose_id: string
@@ -21,6 +39,9 @@ export interface SequencePose {
   position: number
   sanskrit_name?: string
   image_url?: string
+  transition?: string
+  breath_cue?: string
+  modifications?: string[]
 }
 
 export interface SequencePhase {

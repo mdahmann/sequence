@@ -8,7 +8,12 @@ const sequenceParamsSchema = z.object({
   difficulty: z.enum(["beginner", "intermediate", "advanced"]),
   style: z.enum(["vinyasa", "hatha", "yin", "power", "restorative"]),
   focus: z.enum(["full body", "upper body", "lower body", "core", "balance", "flexibility"]),
-  additionalNotes: z.string().optional()
+  additionalNotes: z.string().optional(),
+  peakPose: z.object({
+    id: z.string(),
+    name: z.string(),
+    sanskrit_name: z.string().optional()
+  }).optional()
 })
 
 export async function POST(req: NextRequest) {
