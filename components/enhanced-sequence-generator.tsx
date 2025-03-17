@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import { EnhancedSlider } from "./ui-enhanced/slider"
 import { LoadingSpinner } from "./ui-enhanced/loading-spinner"
 import { useToast } from "@/components/ui/use-toast"
@@ -31,25 +30,6 @@ const focusOptions = [
   "balance",
   "flexibility",
 ] as const
-
-// Custom auth toast with action buttons
-const AuthRequiredToast = () => {
-  const router = useRouter()
-  
-  return (
-    <div className="flex flex-col gap-4">
-      <p>Please sign in or create an account to generate sequences.</p>
-      <div className="flex justify-end gap-2">
-        <Button variant="outline" size="sm" onClick={() => router.push("/login")}>
-          Sign In
-        </Button>
-        <Button size="sm" onClick={() => router.push("/signup")}>
-          Sign Up
-        </Button>
-      </div>
-    </div>
-  )
-}
 
 export function EnhancedSequenceGenerator() {
   const router = useRouter()
@@ -163,7 +143,7 @@ export function EnhancedSequenceGenerator() {
         console.log("Client-side auth check: User is not authenticated")
         toast({
           title: "Authentication Required",
-          description: <AuthRequiredToast />,
+          description: "Please sign in or create an account to generate sequences.",
           variant: "destructive",
         })
         return
@@ -214,7 +194,7 @@ export function EnhancedSequenceGenerator() {
         
         toast({
           title: "Authentication Required",
-          description: <AuthRequiredToast />,
+          description: "Please sign in or create an account to generate sequences.",
           variant: "destructive",
         })
       } else {
