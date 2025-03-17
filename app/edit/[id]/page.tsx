@@ -1087,384 +1087,392 @@ export default function SequenceEditorPage() {
       <main 
         ref={mainContentRef}
         className={cn(
-          "flex-1 transition-all duration-300 h-screen overflow-y-auto bg-beige dark:bg-dark-gray",
+          "flex-1 transition-all duration-300 h-screen overflow-y-auto",
           isLeftSidebarOpen ? "ml-64" : "ml-12",
           isRightSidebarOpen ? "mr-80" : "mr-12"
         )}
+        style={{
+          backgroundImage: 'url("/images/paper-bg.jpg")',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        }}
       >
-        {/* Top Bar */}
-        <div 
-          ref={headerRef}
-          className="sticky top-0 z-10 bg-warm-white dark:bg-deep-charcoal-light border-b border-gray-200 dark:border-gray-700 p-4"
-        >
-          <div className="flex items-center justify-between">
-            {/* Left: Back to Home Button */}
-            <div>
-              <button
-                onClick={handleExit}
-                className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 px-4 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
-              >
-                ← Back to Home
-              </button>
-            </div>
-
-            {/* Center: Title */}
-            <div 
-              className="flex items-center gap-2 cursor-pointer group max-w-xl w-full mx-auto"
-              onClick={isEditingSettings ? undefined : handleStartEditing}
-            >
-              {isEditingSettings ? (
-                <input
-                  type="text"
-                  value={tempSettings?.name || ''}
-                  onChange={(e) => setTempSettings({...tempSettings!, name: e.target.value})}
-                  className="text-xl font-semibold bg-transparent border-b border-dashed border-gray-400 focus:outline-none focus:border-vibrant-blue px-1 w-full"
-                  autoFocus
-                />
-              ) : (
-                <h1 className="text-xl font-semibold group-hover:text-vibrant-blue transition-colors text-center w-full truncate">
-                  {sequence.name}
-                </h1>
-              )}
-            </div>
-
-            {/* Right: Export and Save Buttons */}
-            <div className="flex items-center space-x-3">
-              {isEditingSettings ? (
-                <>
-                  <button
-                    onClick={handleSettingsCancel}
-                    className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSettingsSave}
-                    className="px-4 py-2 bg-vibrant-blue text-white rounded-md hover:bg-vibrant-blue/90 transition-colors"
-                  >
-                    Save Settings
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    onClick={() => {/* TODO: Implement export functionality */}}
-                    className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-2"
-                  >
-                    <Download className="h-4 w-4" />
-                    Export
-                  </button>
-                  <button
-                    onClick={handleSave}
-                    className={cn(
-                      "px-4 py-2 bg-vibrant-blue text-white rounded-md hover:bg-vibrant-blue/90 transition-colors flex items-center gap-2",
-                      hasUnsavedChanges && "animate-pulse"
-                    )}
-                  >
-                    Save
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Sequence Content */}
-        <div className="p-6">
-          {/* Stats Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {/* Duration */}
-            <div 
-              className={cn(
-                "bg-warm-white dark:bg-deep-charcoal-light rounded-lg p-4 shadow-sm",
-                !isEditingSettings && "cursor-pointer hover:border-vibrant-blue/50 hover:shadow-md transition-shadow"
-              )}
-              onClick={isEditingSettings ? undefined : handleStartEditing}
-            >
-              <div className="text-sm text-gray-500 dark:text-gray-400">Duration</div>
-              {isEditingSettings ? (
-                <div>
-                  <input
-                    type="number"
-                    min="1"
-                    value={tempSettings?.duration_minutes || 0}
-                    onChange={(e) => setTempSettings({...tempSettings!, duration_minutes: parseInt(e.target.value) || 1})}
-                    className="text-xl font-semibold w-full bg-transparent border-b border-dashed border-gray-400 focus:outline-none focus:border-vibrant-blue"
-                  />
-                </div>
-              ) : (
-                <div className="text-xl font-semibold group-hover:text-vibrant-blue">{totalDuration.toFixed(1)} min</div>
-              )}
-            </div>
-            
-            {/* Difficulty */}
-            <div 
-              className={cn(
-                "bg-warm-white dark:bg-deep-charcoal-light rounded-lg p-4 shadow-sm",
-                !isEditingSettings && "cursor-pointer hover:border-vibrant-blue/50 hover:shadow-md transition-shadow"
-              )}
-              onClick={isEditingSettings ? undefined : handleStartEditing}
-            >
-              <div className="text-sm text-gray-500 dark:text-gray-400">Difficulty</div>
-              {isEditingSettings ? (
-                <select
-                  value={tempSettings?.difficulty || ''}
-                  onChange={(e) => setTempSettings({...tempSettings!, difficulty: e.target.value})}
-                  className="text-xl font-semibold w-full bg-transparent border-b border-dashed border-gray-400 focus:outline-none focus:border-vibrant-blue capitalize"
-                >
-                  <option value="beginner">Beginner</option>
-                  <option value="intermediate">Intermediate</option>
-                  <option value="advanced">Advanced</option>
-                </select>
-              ) : (
-                <div className="text-xl font-semibold capitalize">{sequence.difficulty}</div>
-              )}
-            </div>
-            
-            {/* Style */}
-            <div 
-              className={cn(
-                "bg-warm-white dark:bg-deep-charcoal-light rounded-lg p-4 shadow-sm",
-                !isEditingSettings && "cursor-pointer hover:border-vibrant-blue/50 hover:shadow-md transition-shadow"
-              )}
-              onClick={isEditingSettings ? undefined : handleStartEditing}
-            >
-              <div className="text-sm text-gray-500 dark:text-gray-400">Style</div>
-              {isEditingSettings ? (
-                <select
-                  value={tempSettings?.style || ''}
-                  onChange={(e) => setTempSettings({...tempSettings!, style: e.target.value})}
-                  className="text-xl font-semibold w-full bg-transparent border-b border-dashed border-gray-400 focus:outline-none focus:border-vibrant-blue capitalize"
-                >
-                  <option value="vinyasa">Vinyasa</option>
-                  <option value="hatha">Hatha</option>
-                  <option value="yin">Yin</option>
-                  <option value="power">Power</option>
-                  <option value="restorative">Restorative</option>
-                </select>
-              ) : (
-                <div className="text-xl font-semibold capitalize">{sequence.style}</div>
-              )}
-            </div>
-            
-            {/* Focus */}
-            <div 
-              className={cn(
-                "bg-warm-white dark:bg-deep-charcoal-light rounded-lg p-4 shadow-sm",
-                !isEditingSettings && "cursor-pointer hover:border-vibrant-blue/50 hover:shadow-md transition-shadow"
-              )}
-              onClick={isEditingSettings ? undefined : handleStartEditing}
-            >
-              <div className="text-sm text-gray-500 dark:text-gray-400">Focus</div>
-              {isEditingSettings ? (
-                <select
-                  value={tempSettings?.focus || ''}
-                  onChange={(e) => setTempSettings({...tempSettings!, focus: e.target.value})}
-                  className="text-xl font-semibold w-full bg-transparent border-b border-dashed border-gray-400 focus:outline-none focus:border-vibrant-blue capitalize"
-                >
-                  <option value="full body">Full Body</option>
-                  <option value="core">Core</option>
-                  <option value="upper body">Upper Body</option>
-                  <option value="lower body">Lower Body</option>
-                  <option value="balance">Balance</option>
-                  <option value="flexibility">Flexibility</option>
-                  <option value="strength">Strength</option>
-                  <option value="relaxation">Relaxation</option>
-                </select>
-              ) : (
-                <div className="text-xl font-semibold capitalize">{sequence.focus}</div>
-              )}
-            </div>
-          </div>
-
-          {isEditingSettings && (
-            <div className="bg-warm-white dark:bg-deep-charcoal-light rounded-lg p-4 shadow-sm mb-6">
-              <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">Description</div>
-              <textarea
-                value={tempSettings?.description || ''}
-                onChange={(e) => setTempSettings({...tempSettings!, description: e.target.value})}
-                className="w-full p-2 bg-transparent border border-dashed border-gray-400 focus:outline-none focus:border-vibrant-blue rounded-md min-h-[80px]"
-                placeholder="Add a description for your sequence..."
-              />
-            </div>
-          )}
-
-          {/* Phases */}
-          <div className="space-y-6 pb-64">
-            {sequence.phases.map((phase, phaseIndex) => (
-              <div
-                key={phase.id}
-                ref={el => {
-                  phaseRefs.current[phase.id] = el;
-                  return undefined;
-                }}
-                className={cn(
-                  "bg-warm-white dark:bg-deep-charcoal-light rounded-lg shadow-sm overflow-hidden",
-                  dragOverPhaseId === phase.id && "ring-2 ring-vibrant-blue"
-                )}
-              >
+        <div className="bg-white/95 dark:bg-deep-charcoal-light/95 min-h-screen">
+          {/* Top Bar */}
+          <div 
+            ref={headerRef}
+            className="sticky top-0 z-10 bg-warm-white/90 dark:bg-deep-charcoal-light/90 border-b border-gray-200 dark:border-gray-700 p-4"
+          >
+            <div className="flex items-center justify-between">
+              {/* Left: Back to Home Button */}
+              <div>
                 <button
-                  onClick={() => togglePhaseExpansion(phase.id)}
-                  className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-800"
+                  onClick={handleExit}
+                  className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 px-4 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
                 >
-                  <div className="flex items-center">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary mr-3">
-                      {phaseIndex + 1}
-                    </div>
-                    <h3 className="text-lg font-medium">{phase.name}</h3>
-                  </div>
-                  {expandedPhases.includes(phase.id) ? (
-                    <ChevronDown className="h-5 w-5" />
-                  ) : (
-                    <ChevronRight className="h-5 w-5" />
-                  )}
+                  ← Back to Home
                 </button>
+              </div>
 
-                {expandedPhases.includes(phase.id) && (
-                  <div 
-                    className="px-6 pb-4"
-                    onDragOver={(e) => handleDragOver(e, phase.id)}
-                    onDragLeave={handleDragLeave}
-                    onDrop={(e) => handleDrop(e, phase.id)}
-                  >
-                    <p className="text-gray-600 dark:text-gray-400 mb-4 ml-11">
-                      {phase.description}
-                    </p>
-
-                    <div className="space-y-3 ml-11">
-                      {isPosesLoading ? (
-                        // Show skeleton UI when poses are loading
-                        Array(3).fill(0).map((_, i) => (
-                          <PoseSkeleton key={i} />
-                        ))
-                      ) : (
-                        // Show actual poses when loaded
-                        phase.poses.map((pose, index) => (
-                          <motion.div
-                            key={pose.id}
-                            layoutId={pose.id}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ 
-                              type: "spring", 
-                              stiffness: 500, 
-                              damping: 30,
-                              delay: index * 0.05 
-                            }}
-                            className={cn(
-                              "bg-warm-white dark:bg-deep-charcoal-light rounded-lg shadow-sm overflow-hidden w-full",
-                              isDragging && draggedPose?.id === pose.id ? "border-2 border-vibrant-blue" : "",
-                              pose.side === "left" ? "border-l-4 border-l-blue-400" : "",
-                              pose.side === "right" ? "border-r-4 border-r-purple-400" : ""
-                            )}
-                            drag="y"
-                            dragConstraints={{ top: 0, bottom: 0 }}
-                            dragElastic={0.1}
-                            onDragStart={() => {
-                              setIsDragging(true)
-                              setDraggedPose(pose)
-                            }}
-                            onDragEnd={() => {
-                              setIsDragging(false)
-                              setDraggedPose(null)
-                            }}
-                          >
-                            <div className="flex items-stretch">
-                              {/* Drag Handle */}
-                              <div className="bg-gray-100 dark:bg-gray-800 flex items-center justify-center px-3 cursor-move">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-                                </svg>
-                              </div>
-                              
-                              {/* Side Indicator */}
-                              {pose.side && (
-                                <div className={cn(
-                                  "w-1.5 h-full",
-                                  pose.side === "left" ? "bg-blue-400/20" : "bg-purple-400/20"
-                                )}></div>
-                              )}
-                              
-                              {/* Pose Info */}
-                              <div className={cn(
-                                "flex-grow p-4 flex justify-between items-center",
-                                pose.side === "left" ? "bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-900/10 dark:to-transparent" : "",
-                                pose.side === "right" ? "bg-gradient-to-l from-purple-50/50 to-transparent dark:from-purple-900/10 dark:to-transparent" : ""
-                              )}>
-                                <div className="flex items-center">
-                                  {pose.side === "left" && (
-                                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 mr-3 flex-shrink-0">
-                                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                                      </svg>
-                                    </div>
-                                  )}
-                                  {pose.side === "right" && (
-                                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 mr-3 flex-shrink-0">
-                                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                                      </svg>
-                                    </div>
-                                  )}
-                                  <div>
-                                    <div className="font-medium flex items-center">
-                                      {pose.name}
-                                      {pose.side && (
-                                        <button 
-                                          onClick={() => togglePoseSide(pose.id)}
-                                          className={cn(
-                                            "ml-2 px-2 py-0.5 text-xs rounded-full",
-                                            pose.side === "left" 
-                                              ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100" 
-                                              : "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100"
-                                          )}
-                                        >
-                                          {pose.side === "left" ? "Left" : "Right"}
-                                        </button>
-                                      )}
-                                    </div>
-                                    {pose.sanskrit_name && (
-                                      <div className="text-sm text-gray-500 dark:text-gray-400 italic">
-                                        {pose.sanskrit_name}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                                
-                                {/* Duration Selector */}
-                                <div className="flex items-center space-x-3">
-                                  <button 
-                                    onClick={() => handleDurationChange(pose.id, Math.max(5, pose.duration_seconds - 5))}
-                                    className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
-                                  >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                      <path fillRule="evenodd" d="M5 10a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z" clipRule="evenodd" />
-                                    </svg>
-                                  </button>
-                                  
-                                  <div className="w-16 text-center font-medium">
-                                    {Math.floor(pose.duration_seconds / 60)}:{(pose.duration_seconds % 60).toString().padStart(2, '0')}
-                                  </div>
-                                  
-                                  <button 
-                                    onClick={() => handleDurationChange(pose.id, pose.duration_seconds + 5)}
-                                    className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
-                                  >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                      <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
-                                    </svg>
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          </motion.div>
-                        ))
-                      )}
-                    </div>
-                  </div>
+              {/* Center: Title */}
+              <div 
+                className="flex items-center gap-2 cursor-pointer group max-w-xl w-full mx-auto"
+                onClick={isEditingSettings ? undefined : handleStartEditing}
+              >
+                {isEditingSettings ? (
+                  <input
+                    type="text"
+                    value={tempSettings?.name || ''}
+                    onChange={(e) => setTempSettings({...tempSettings!, name: e.target.value})}
+                    className="text-xl font-semibold bg-transparent border-b border-dashed border-gray-400 focus:outline-none focus:border-vibrant-blue px-1 w-full"
+                    autoFocus
+                  />
+                ) : (
+                  <h1 className="text-xl font-semibold group-hover:text-vibrant-blue transition-colors text-center w-full truncate">
+                    {sequence.name}
+                  </h1>
                 )}
               </div>
-            ))}
+
+              {/* Right: Export and Save Buttons */}
+              <div className="flex items-center space-x-3">
+                {isEditingSettings ? (
+                  <>
+                    <button
+                      onClick={handleSettingsCancel}
+                      className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSettingsSave}
+                      className="px-4 py-2 bg-vibrant-blue text-white rounded-md hover:bg-vibrant-blue/90 transition-colors"
+                    >
+                      Save Settings
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => {/* TODO: Implement export functionality */}}
+                      className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-2"
+                    >
+                      <Download className="h-4 w-4" />
+                      Export
+                    </button>
+                    <button
+                      onClick={handleSave}
+                      className={cn(
+                        "px-4 py-2 bg-vibrant-blue text-white rounded-md hover:bg-vibrant-blue/90 transition-colors flex items-center gap-2",
+                        hasUnsavedChanges && "animate-pulse"
+                      )}
+                    >
+                      Save
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Sequence Content */}
+          <div className="p-6">
+            {/* Stats Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              {/* Duration */}
+              <div 
+                className={cn(
+                  "bg-warm-white dark:bg-deep-charcoal-light rounded-lg p-4 shadow-sm",
+                  !isEditingSettings && "cursor-pointer hover:border-vibrant-blue/50 hover:shadow-md transition-shadow"
+                )}
+                onClick={isEditingSettings ? undefined : handleStartEditing}
+              >
+                <div className="text-sm text-gray-500 dark:text-gray-400">Duration</div>
+                {isEditingSettings ? (
+                  <div>
+                    <input
+                      type="number"
+                      min="1"
+                      value={tempSettings?.duration_minutes || 0}
+                      onChange={(e) => setTempSettings({...tempSettings!, duration_minutes: parseInt(e.target.value) || 1})}
+                      className="text-xl font-semibold w-full bg-transparent border-b border-dashed border-gray-400 focus:outline-none focus:border-vibrant-blue"
+                    />
+                  </div>
+                ) : (
+                  <div className="text-xl font-semibold group-hover:text-vibrant-blue">{totalDuration.toFixed(1)} min</div>
+                )}
+              </div>
+              
+              {/* Difficulty */}
+              <div 
+                className={cn(
+                  "bg-warm-white dark:bg-deep-charcoal-light rounded-lg p-4 shadow-sm",
+                  !isEditingSettings && "cursor-pointer hover:border-vibrant-blue/50 hover:shadow-md transition-shadow"
+                )}
+                onClick={isEditingSettings ? undefined : handleStartEditing}
+              >
+                <div className="text-sm text-gray-500 dark:text-gray-400">Difficulty</div>
+                {isEditingSettings ? (
+                  <select
+                    value={tempSettings?.difficulty || ''}
+                    onChange={(e) => setTempSettings({...tempSettings!, difficulty: e.target.value})}
+                    className="text-xl font-semibold w-full bg-transparent border-b border-dashed border-gray-400 focus:outline-none focus:border-vibrant-blue capitalize"
+                  >
+                    <option value="beginner">Beginner</option>
+                    <option value="intermediate">Intermediate</option>
+                    <option value="advanced">Advanced</option>
+                  </select>
+                ) : (
+                  <div className="text-xl font-semibold capitalize">{sequence.difficulty}</div>
+                )}
+              </div>
+              
+              {/* Style */}
+              <div 
+                className={cn(
+                  "bg-warm-white dark:bg-deep-charcoal-light rounded-lg p-4 shadow-sm",
+                  !isEditingSettings && "cursor-pointer hover:border-vibrant-blue/50 hover:shadow-md transition-shadow"
+                )}
+                onClick={isEditingSettings ? undefined : handleStartEditing}
+              >
+                <div className="text-sm text-gray-500 dark:text-gray-400">Style</div>
+                {isEditingSettings ? (
+                  <select
+                    value={tempSettings?.style || ''}
+                    onChange={(e) => setTempSettings({...tempSettings!, style: e.target.value})}
+                    className="text-xl font-semibold w-full bg-transparent border-b border-dashed border-gray-400 focus:outline-none focus:border-vibrant-blue capitalize"
+                  >
+                    <option value="vinyasa">Vinyasa</option>
+                    <option value="hatha">Hatha</option>
+                    <option value="yin">Yin</option>
+                    <option value="power">Power</option>
+                    <option value="restorative">Restorative</option>
+                  </select>
+                ) : (
+                  <div className="text-xl font-semibold capitalize">{sequence.style}</div>
+                )}
+              </div>
+              
+              {/* Focus */}
+              <div 
+                className={cn(
+                  "bg-warm-white dark:bg-deep-charcoal-light rounded-lg p-4 shadow-sm",
+                  !isEditingSettings && "cursor-pointer hover:border-vibrant-blue/50 hover:shadow-md transition-shadow"
+                )}
+                onClick={isEditingSettings ? undefined : handleStartEditing}
+              >
+                <div className="text-sm text-gray-500 dark:text-gray-400">Focus</div>
+                {isEditingSettings ? (
+                  <select
+                    value={tempSettings?.focus || ''}
+                    onChange={(e) => setTempSettings({...tempSettings!, focus: e.target.value})}
+                    className="text-xl font-semibold w-full bg-transparent border-b border-dashed border-gray-400 focus:outline-none focus:border-vibrant-blue capitalize"
+                  >
+                    <option value="full body">Full Body</option>
+                    <option value="core">Core</option>
+                    <option value="upper body">Upper Body</option>
+                    <option value="lower body">Lower Body</option>
+                    <option value="balance">Balance</option>
+                    <option value="flexibility">Flexibility</option>
+                    <option value="strength">Strength</option>
+                    <option value="relaxation">Relaxation</option>
+                  </select>
+                ) : (
+                  <div className="text-xl font-semibold capitalize">{sequence.focus}</div>
+                )}
+              </div>
+            </div>
+
+            {isEditingSettings && (
+              <div className="bg-warm-white dark:bg-deep-charcoal-light rounded-lg p-4 shadow-sm mb-6">
+                <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">Description</div>
+                <textarea
+                  value={tempSettings?.description || ''}
+                  onChange={(e) => setTempSettings({...tempSettings!, description: e.target.value})}
+                  className="w-full p-2 bg-transparent border border-dashed border-gray-400 focus:outline-none focus:border-vibrant-blue rounded-md min-h-[80px]"
+                  placeholder="Add a description for your sequence..."
+                />
+              </div>
+            )}
+
+            {/* Phases */}
+            <div className="space-y-6 pb-64">
+              {sequence.phases.map((phase, phaseIndex) => (
+                <div
+                  key={phase.id}
+                  ref={el => {
+                    phaseRefs.current[phase.id] = el;
+                    return undefined;
+                  }}
+                  className={cn(
+                    "bg-warm-white dark:bg-deep-charcoal-light rounded-lg shadow-sm overflow-hidden",
+                    dragOverPhaseId === phase.id && "ring-2 ring-vibrant-blue"
+                  )}
+                >
+                  <button
+                    onClick={() => togglePhaseExpansion(phase.id)}
+                    className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-800"
+                  >
+                    <div className="flex items-center">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary mr-3">
+                        {phaseIndex + 1}
+                      </div>
+                      <h3 className="text-lg font-medium">{phase.name}</h3>
+                    </div>
+                    {expandedPhases.includes(phase.id) ? (
+                      <ChevronDown className="h-5 w-5" />
+                    ) : (
+                      <ChevronRight className="h-5 w-5" />
+                    )}
+                  </button>
+
+                  {expandedPhases.includes(phase.id) && (
+                    <div 
+                      className="px-6 pb-4"
+                      onDragOver={(e) => handleDragOver(e, phase.id)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, phase.id)}
+                    >
+                      <p className="text-gray-600 dark:text-gray-400 mb-4 ml-11">
+                        {phase.description}
+                      </p>
+
+                      <div className="space-y-3 ml-11">
+                        {isPosesLoading ? (
+                          // Show skeleton UI when poses are loading
+                          Array(3).fill(0).map((_, i) => (
+                            <PoseSkeleton key={i} />
+                          ))
+                        ) : (
+                          // Show actual poses when loaded
+                          phase.poses.map((pose, index) => (
+                            <motion.div
+                              key={pose.id}
+                              layoutId={pose.id}
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ 
+                                type: "spring", 
+                                stiffness: 500, 
+                                damping: 30,
+                                delay: index * 0.05 
+                              }}
+                              className={cn(
+                                "bg-warm-white dark:bg-deep-charcoal-light rounded-lg shadow-sm overflow-hidden w-full",
+                                isDragging && draggedPose?.id === pose.id ? "border-2 border-vibrant-blue" : "",
+                                pose.side === "left" ? "border-l-4 border-l-blue-400" : "",
+                                pose.side === "right" ? "border-r-4 border-r-purple-400" : ""
+                              )}
+                              drag="y"
+                              dragConstraints={{ top: 0, bottom: 0 }}
+                              dragElastic={0.1}
+                              onDragStart={() => {
+                                setIsDragging(true)
+                                setDraggedPose(pose)
+                              }}
+                              onDragEnd={() => {
+                                setIsDragging(false)
+                                setDraggedPose(null)
+                              }}
+                            >
+                              <div className="flex items-stretch">
+                                {/* Drag Handle */}
+                                <div className="bg-gray-100 dark:bg-gray-800 flex items-center justify-center px-3 cursor-move">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                                  </svg>
+                                </div>
+                                
+                                {/* Side Indicator */}
+                                {pose.side && (
+                                  <div className={cn(
+                                    "w-1.5 h-full",
+                                    pose.side === "left" ? "bg-blue-400/20" : "bg-purple-400/20"
+                                  )}></div>
+                                )}
+                                
+                                {/* Pose Info */}
+                                <div className={cn(
+                                  "flex-grow p-4 flex justify-between items-center",
+                                  pose.side === "left" ? "bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-900/10 dark:to-transparent" : "",
+                                  pose.side === "right" ? "bg-gradient-to-l from-purple-50/50 to-transparent dark:from-purple-900/10 dark:to-transparent" : ""
+                                )}>
+                                  <div className="flex items-center">
+                                    {pose.side === "left" && (
+                                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 mr-3 flex-shrink-0">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                                        </svg>
+                                      </div>
+                                    )}
+                                    {pose.side === "right" && (
+                                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 mr-3 flex-shrink-0">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                        </svg>
+                                      </div>
+                                    )}
+                                    <div>
+                                      <div className="font-medium flex items-center">
+                                        {pose.name}
+                                        {pose.side && (
+                                          <button 
+                                            onClick={() => togglePoseSide(pose.id)}
+                                            className={cn(
+                                              "ml-2 px-2 py-0.5 text-xs rounded-full",
+                                              pose.side === "left" 
+                                                ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100" 
+                                                : "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100"
+                                            )}
+                                          >
+                                            {pose.side === "left" ? "Left" : "Right"}
+                                          </button>
+                                        )}
+                                      </div>
+                                      {pose.sanskrit_name && (
+                                        <div className="text-sm text-gray-500 dark:text-gray-400 italic">
+                                          {pose.sanskrit_name}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Duration Selector */}
+                                  <div className="flex items-center space-x-3">
+                                    <button 
+                                      onClick={() => handleDurationChange(pose.id, Math.max(5, pose.duration_seconds - 5))}
+                                      className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+                                    >
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M5 10a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z" clipRule="evenodd" />
+                                      </svg>
+                                    </button>
+                                    
+                                    <div className="w-16 text-center font-medium">
+                                      {Math.floor(pose.duration_seconds / 60)}:{(pose.duration_seconds % 60).toString().padStart(2, '0')}
+                                    </div>
+                                    
+                                    <button 
+                                      onClick={() => handleDurationChange(pose.id, pose.duration_seconds + 5)}
+                                      className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+                                    >
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+                                      </svg>
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </motion.div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </main>
