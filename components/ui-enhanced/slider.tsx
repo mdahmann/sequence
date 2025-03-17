@@ -1,20 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useRef, useCallback } from "react"
-import { motion, PanInfo } from "framer-motion"
-
-// Simple debounce function implementation
-function debounce<T extends (...args: any[]) => any>(
-  func: T,
-  wait: number
-): (...args: Parameters<T>) => void {
-  let timeout: NodeJS.Timeout | null = null;
-  
-  return function(...args: Parameters<T>) {
-    if (timeout) clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
-  };
-}
+import React, { useState, useEffect, useRef } from "react"
 
 interface EnhancedSliderProps {
   min: number
@@ -40,150 +26,191 @@ export function EnhancedSlider({
   className = "",
 }: EnhancedSliderProps) {
   const [isDragging, setIsDragging] = useState(false)
-  const [displayValue, setDisplayValue] = useState(value)
-  const [localValue, setLocalValue] = useState(value)
-  const sliderRef = useRef<HTMLDivElement>(null)
+  const [currentValue, setCurrentValue] = useState(value)
   const trackRef = useRef<HTMLDivElement>(null)
+  const thumbRef = useRef<HTMLDivElement>(null)
 
-  // Update displayed value when actual value changes
+  // Update internal value when prop changes
   useEffect(() => {
-    setDisplayValue(value)
-    setLocalValue(value)
+    setCurrentValue(value)
   }, [value])
 
-  // Debounced onChange to prevent too many updates
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const debouncedOnChange = useCallback(
-    debounce((newValue: number) => {
-      onChange(newValue)
-    }, 10),
-    [onChange]
-  )
+  // Calculate percentage for positioning
+  const percentage = Math.max(0, Math.min(100, ((currentValue - min) / (max - min)) * 100))
 
-  // Calculate the percentage position for the thumb
-  const percentage = ((localValue - min) / (max - min)) * 100
-
-  // Handle value calculation from position
-  const calculateValueFromPosition = useCallback((clientX: number) => {
-    if (!trackRef.current) return localValue
+  // Calculate value from position
+  const calculateValueFromPosition = (clientX: number) => {
+    if (!trackRef.current) return currentValue
     
-    const rect = trackRef.current.getBoundingClientRect()
-    const position = (clientX - rect.left) / rect.width
+    const trackRect = trackRef.current.getBoundingClientRect()
+    const position = (clientX - trackRect.left) / trackRect.width
     const boundedPosition = Math.max(0, Math.min(1, position))
-    const newValue = min + boundedPosition * (max - min)
-    const steppedValue = Math.round(newValue / step) * step
-    return Math.max(min, Math.min(max, steppedValue))
-  }, [localValue, max, min, step])
+    
+    let newValue = min + boundedPosition * (max - min)
+    newValue = Math.round(newValue / step) * step
+    return Math.max(min, Math.min(max, newValue))
+  }
 
-  // Generate tick marks if enabled
-  const ticks = []
-  if (showTicks) {
+  // Handle mouse down on thumb
+  const handleThumbMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsDragging(true)
+    
+    // Calculate initial position
+    const startX = e.clientX
+    const startValue = currentValue
+    
+    // Handle mouse move
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!trackRef.current) return
+      
+      const trackRect = trackRef.current.getBoundingClientRect()
+      const trackWidth = trackRect.width
+      
+      // Calculate value change based on mouse movement
+      const deltaX = moveEvent.clientX - startX
+      const deltaRatio = deltaX / trackWidth
+      const deltaValue = deltaRatio * (max - min)
+      
+      // Apply step and constraints
+      let newValue = startValue + deltaValue
+      newValue = Math.round(newValue / step) * step
+      newValue = Math.max(min, Math.min(max, newValue))
+      
+      setCurrentValue(newValue)
+      onChange(newValue)
+    }
+    
+    // Handle mouse up
+    const handleMouseUp = () => {
+      setIsDragging(false)
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+    
+    // Add event listeners
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+  }
+  
+  // Handle touch events for mobile
+  const handleThumbTouchStart = (e: React.TouchEvent) => {
+    e.preventDefault() // Prevent scrolling
+    setIsDragging(true)
+    
+    const touch = e.touches[0]
+    const startX = touch.clientX
+    const startValue = currentValue
+    
+    // Handle touch move
+    const handleTouchMove = (moveEvent: TouchEvent) => {
+      if (!trackRef.current) return
+      
+      const touch = moveEvent.touches[0]
+      const trackRect = trackRef.current.getBoundingClientRect()
+      const trackWidth = trackRect.width
+      
+      // Calculate value change based on touch movement
+      const deltaX = touch.clientX - startX
+      const deltaRatio = deltaX / trackWidth
+      const deltaValue = deltaRatio * (max - min)
+      
+      // Apply step and constraints
+      let newValue = startValue + deltaValue
+      newValue = Math.round(newValue / step) * step
+      newValue = Math.max(min, Math.min(max, newValue))
+      
+      setCurrentValue(newValue)
+      onChange(newValue)
+    }
+    
+    // Handle touch end
+    const handleTouchEnd = () => {
+      setIsDragging(false)
+      document.removeEventListener('touchmove', handleTouchMove)
+      document.removeEventListener('touchend', handleTouchEnd)
+    }
+    
+    // Add event listeners
+    document.addEventListener('touchmove', handleTouchMove, { passive: false })
+    document.addEventListener('touchend', handleTouchEnd)
+  }
+  
+  // Handle track click
+  const handleTrackClick = (e: React.MouseEvent) => {
+    if (!trackRef.current || e.target === thumbRef.current) return
+    
+    const newValue = calculateValueFromPosition(e.clientX)
+    setCurrentValue(newValue)
+    onChange(newValue)
+  }
+  
+  // Generate tick marks
+  const renderTicks = () => {
+    if (!showTicks) return null
+    
+    const ticks = []
     const numTicks = Math.floor((max - min) / tickInterval) + 1
+    
     for (let i = 0; i < numTicks; i++) {
       const tickValue = min + i * tickInterval
       if (tickValue <= max) {
         const tickPosition = ((tickValue - min) / (max - min)) * 100
-        ticks.push({
-          value: tickValue,
-          position: tickPosition,
-        })
+        
+        ticks.push(
+          <div
+            key={tickValue}
+            className="absolute top-1/2 -translate-y-1/2 w-1 h-3 bg-gray-400 dark:bg-gray-500 rounded-full cursor-pointer"
+            style={{ left: `${tickPosition}%` }}
+            onClick={(e) => {
+              e.stopPropagation()
+              setCurrentValue(tickValue)
+              onChange(tickValue)
+            }}
+          />
+        )
       }
     }
+    
+    return ticks
   }
-
-  // Handle track click
-  const handleTrackClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const newValue = calculateValueFromPosition(e.clientX)
-    setDisplayValue(newValue)
-    setLocalValue(newValue)
-    onChange(newValue) // Immediate feedback for clicks
-  }, [calculateValueFromPosition, onChange])
-
-  // Handle thumb drag
-  const handleDrag = useCallback((_: MouseEvent, info: PanInfo) => {
-    const newValue = calculateValueFromPosition(info.point.x)
-    setDisplayValue(newValue)
-    setLocalValue(newValue)
-    debouncedOnChange(newValue)
-  }, [calculateValueFromPosition, debouncedOnChange])
 
   return (
     <div className={`relative py-4 ${className}`}>
       {/* Slider track */}
       <div 
-        ref={sliderRef}
+        ref={trackRef}
         className="relative h-2 rounded-full bg-gray-200 dark:bg-gray-700 cursor-pointer"
+        onClick={handleTrackClick}
       >
-        {/* Actual clickable track */}
-        <div
-          ref={trackRef}
-          className="absolute inset-0 z-10"
-          onClick={handleTrackClick}
-        />
-        
         {/* Filled track */}
-        <motion.div
-          className="absolute h-full rounded-full bg-vibrant-blue"
+        <div
+          className="absolute h-full rounded-full bg-vibrant-blue transition-all duration-100 ease-out"
           style={{ width: `${percentage}%` }}
-          transition={{ type: "tween", ease: "easeOut", duration: 0.1 }}
         />
         
         {/* Tick marks */}
-        {showTicks && ticks.map((tick) => (
-          <div
-            key={tick.value}
-            className="absolute top-1/2 -translate-y-1/2 w-1 h-3 bg-gray-400 dark:bg-gray-500 rounded-full"
-            style={{ left: `${tick.position}%` }}
-            onClick={(e) => {
-              e.stopPropagation()
-              setDisplayValue(tick.value)
-              setLocalValue(tick.value)
-              onChange(tick.value)
-            }}
-          />
-        ))}
+        {renderTicks()}
         
         {/* Thumb */}
-        <motion.div
-          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-5 bg-white dark:bg-gray-800 border-2 border-vibrant-blue rounded-full shadow-md cursor-grab touch-none z-20"
-          style={{ left: `${percentage}%` }}
-          animate={{ 
-            scale: isDragging ? 1.2 : 1,
-            boxShadow: isDragging 
-              ? "0 0 0 4px rgba(79, 70, 229, 0.2)" 
-              : "0 1px 3px rgba(0, 0, 0, 0.2)"
+        <div
+          ref={thumbRef}
+          className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-5 bg-white dark:bg-gray-800 border-2 border-vibrant-blue rounded-full shadow-md cursor-grab touch-none z-20 transition-transform duration-100 ${isDragging ? 'scale-125 shadow-lg' : ''}`}
+          style={{ 
+            left: `${percentage}%`,
+            boxShadow: isDragging ? '0 0 0 4px rgba(79, 70, 229, 0.2)' : '0 1px 3px rgba(0, 0, 0, 0.2)'
           }}
-          transition={{ 
-            type: "spring", 
-            stiffness: 500, 
-            damping: 30, 
-            mass: 0.5 
-          }}
-          drag="x"
-          dragConstraints={sliderRef}
-          dragElastic={0}
-          dragMomentum={false}
-          onDragStart={() => setIsDragging(true)}
-          onDragEnd={() => {
-            setIsDragging(false)
-            onChange(localValue) // Ensure final value is committed
-          }}
-          onDrag={handleDrag}
+          onMouseDown={handleThumbMouseDown}
+          onTouchStart={handleThumbTouchStart}
         />
       </div>
       
       {/* Value display */}
       <div className="mt-2 flex justify-between text-sm text-gray-600 dark:text-gray-400">
         <div>{formatValue(min)}</div>
-        <motion.div 
-          className="font-semibold text-vibrant-blue"
-          key={displayValue}
-          initial={{ opacity: 0.8, y: -5 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ type: "tween", duration: 0.1 }}
-        >
-          {formatValue(displayValue)}
-        </motion.div>
+        <div className="font-semibold text-vibrant-blue">
+          {formatValue(currentValue)}
+        </div>
         <div>{formatValue(max)}</div>
       </div>
     </div>
