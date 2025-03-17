@@ -6,7 +6,7 @@ import type { Pose } from "@/types/pose"
 import { PageContainer } from "@/components/page-container"
 
 export default async function PoseDetailPage({ params }: { params: { id: string } }) {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
   const poseId = params.id
 
   // Fetch the pose details

@@ -12,7 +12,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Pose ID is required" }, { status: 400 })
     }
 
-    const supabase = createServerSupabaseClient()
+    // Get the Supabase client
+    const supabase = await createServerSupabaseClient()
 
     // Fetch the pose details
     const { data: pose, error: poseError } = await supabase
