@@ -1,17 +1,39 @@
 import { createClient } from "@supabase/supabase-js"
+import { createServerClient } from "@supabase/ssr"
+import { cookies } from "next/headers"
 import type { Database } from "@/types/supabase"
 
 // Create a single instance of the Supabase client for server-side use
-// This approach uses service role key for server operations
+// This function now uses the createServerClient method for proper cookie handling
 export function createServerSupabaseClient() {
-  return createClient<Database>(
-    process.env.SUPABASE_URL!, 
-    // Use the service role key for server-side operations
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY!,
+  // Create a client that works in Server Components and API Routes
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
+      cookies: {
+        get(name: string) {
+          try {
+            return cookies().get(name)?.value
+          } catch (error) {
+            console.error('Error getting cookie:', error)
+            return undefined
+          }
+        },
+        set(name: string, value: string, options: { path: string; maxAge?: number; domain?: string; secure?: boolean; sameSite?: 'strict' | 'lax' | 'none' }) {
+          try {
+            cookies().set(name, value, options)
+          } catch (error) {
+            console.error('Error setting cookie:', error)
+          }
+        },
+        remove(name: string, options: { path: string; maxAge?: number; domain?: string; secure?: boolean; sameSite?: 'strict' | 'lax' | 'none' }) {
+          try {
+            cookies().set(name, '', { ...options, maxAge: 0 })
+          } catch (error) {
+            console.error('Error removing cookie:', error)
+          }
+        }
       }
     }
   )

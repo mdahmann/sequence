@@ -15,23 +15,6 @@ const sequenceParamsSchema = z.object({
 export async function POST(req: NextRequest) {
   console.log("Starting POST request to /api/sequence/generate")
   
-  // First, check authentication
-  const supabase = createServerSupabaseClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  
-  if (!session?.user?.id) {
-    console.log("API route: User not authenticated - returning 401")
-    return NextResponse.json(
-      { 
-        error: "Authentication required", 
-        message: "Please sign in or create an account to generate sequences." 
-      },
-      { status: 401 }
-    )
-  }
-  
-  console.log(`API route: User authenticated with ID ${session.user.id}`)
-  
   try {
     // Parse and validate request body
     const body = await req.json()
@@ -45,8 +28,8 @@ export async function POST(req: NextRequest) {
       )
     }
     
-    // Generate sequence
-    console.log("API route: Generating sequence...")
+    // Generate sequence - no auth check for now
+    console.log("API route: Generating sequence without auth check...")
     const sequence = await serverSequenceService.generateSequence(validatedParams.data)
     
     // Return generated sequence
