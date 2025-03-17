@@ -10,7 +10,10 @@ export async function GET(
     const params = await context.params;
     const id = params.id;
     
+    console.log(`API: Fetching sequence with ID: ${id}`);
+    
     if (!id) {
+      console.log('API: No ID provided');
       return NextResponse.json(
         { error: 'Sequence ID is required' },
         { status: 400 }
@@ -18,24 +21,37 @@ export async function GET(
     }
     
     const supabase = createServerSupabaseClient()
+    console.log(`API: Supabase client created, querying for sequence ID: ${id}`);
+    
     const { data, error } = await supabase
       .from('sequences')
       .select('*')
       .eq('id', id)
       .single()
 
-    if (error || !data) {
+    if (error) {
+      console.log(`API: Error fetching sequence: ${error.message}`, error);
       return NextResponse.json(
-        { error: 'Sequence not found' },
+        { error: 'Sequence not found', details: error.message },
         { status: 404 }
       )
     }
 
+    if (!data) {
+      console.log(`API: No sequence found with ID: ${id}`);
+      return NextResponse.json(
+        { error: 'Sequence not found', details: 'No data returned' },
+        { status: 404 }
+      )
+    }
+
+    console.log(`API: Successfully retrieved sequence: ${id}`);
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error fetching sequence:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`API: Uncaught error fetching sequence: ${errorMessage}`, error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: errorMessage },
       { status: 500 }
     )
   }

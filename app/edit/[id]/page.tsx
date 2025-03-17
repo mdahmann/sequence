@@ -688,20 +688,32 @@ export default function SequenceEditorPage() {
     const fetchSequence = async () => {
       try {
         setIsLoading(true)
-        const response = await fetch(`/api/sequences/${sequenceId}`);
+        console.log(`Client: Fetching sequence with ID: ${sequenceId}`);
+        
+        // Add a timestamp to prevent caching
+        const response = await fetch(`/api/sequences/${sequenceId}?t=${Date.now()}`);
         
         if (!response.ok) {
+          console.log(`Client: Error response ${response.status}: ${response.statusText}`);
+          
           if (response.status === 404) {
-            notFound();
+            console.log("Client: Sequence not found, redirecting to home page");
+            showToast("Sequence not found", "error");
+            router.push('/');
+            return;
           }
+          
           throw new Error(`Error ${response.status}: ${response.statusText}`);
         }
         
         const data = await response.json();
+        console.log(`Client: Successfully fetched sequence:`, data.id);
         setSequence(data);
       } catch (error) {
-        console.error("Failed to fetch sequence:", error);
+        console.error("Client: Failed to fetch sequence:", error);
         showToast("Failed to load sequence", "error");
+        // Redirect to home after error
+        router.push('/');
       } finally {
         setIsLoading(false);
       }
@@ -710,7 +722,7 @@ export default function SequenceEditorPage() {
     if (sequenceId) {
       fetchSequence();
     }
-  }, [sequenceId, showToast]);
+  }, [sequenceId, showToast, router]);
   
   if (!sequenceId || isLoading) {
     return (
