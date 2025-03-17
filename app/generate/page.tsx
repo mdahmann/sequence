@@ -25,7 +25,7 @@ export default function GeneratePage() {
         </EnhancedToastProvider>
       </div>
       
-      <div className="mt-16 pt-16 border-t border-gray-200 dark:border-gray-800">
+      <div className="mt-16 pt-16 pb-32 border-t border-gray-200 dark:border-gray-800">
         <div className="text-center mb-12">
           <h2 className="text-2xl font-sans font-normal tracking-tight text-foreground mb-3">
             How It Works
