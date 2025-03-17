@@ -19,43 +19,48 @@ export default function GeneratePage() {
         </p>
       </div>
       
-      <div className="mb-16">
+      <div className="mb-24">
         <EnhancedToastProvider>
           <EnhancedSequenceGenerator />
         </EnhancedToastProvider>
       </div>
       
-      <div className="bg-warm-white dark:bg-deep-charcoal-light rounded-lg p-8 shadow-sm">
-        <h2 className="text-2xl font-sans font-normal tracking-tight text-foreground mb-6 text-center">
-          How It Works
-        </h2>
+      <div className="mt-16 pt-16 border-t border-gray-200 dark:border-gray-800">
+        <div className="text-center mb-12">
+          <h2 className="text-2xl font-sans font-normal tracking-tight text-foreground mb-3">
+            How It Works
+          </h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto">
+            Three simple steps to create your perfect yoga sequence
+          </p>
+        </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="flex flex-col items-center text-center">
-            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-              <span className="text-xl font-semibold text-primary">1</span>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+          <div className="flex flex-col items-center text-center group">
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors">
+              <span className="text-2xl font-semibold text-primary">1</span>
             </div>
-            <h3 className="text-lg font-medium mb-2">Set Parameters</h3>
+            <h3 className="text-xl font-medium mb-3">Set Parameters</h3>
             <p className="text-muted-foreground">
               Choose duration, difficulty, style, and focus area for your practice.
             </p>
           </div>
           
-          <div className="flex flex-col items-center text-center">
-            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-              <span className="text-xl font-semibold text-primary">2</span>
+          <div className="flex flex-col items-center text-center group">
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors">
+              <span className="text-2xl font-semibold text-primary">2</span>
             </div>
-            <h3 className="text-lg font-medium mb-2">Generate</h3>
+            <h3 className="text-xl font-medium mb-3">Generate</h3>
             <p className="text-muted-foreground">
               Our AI creates a balanced sequence with mindful transitions.
             </p>
           </div>
           
-          <div className="flex flex-col items-center text-center">
-            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-              <span className="text-xl font-semibold text-primary">3</span>
+          <div className="flex flex-col items-center text-center group">
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors">
+              <span className="text-2xl font-semibold text-primary">3</span>
             </div>
-            <h3 className="text-lg font-medium mb-2">Customize</h3>
+            <h3 className="text-xl font-medium mb-3">Customize</h3>
             <p className="text-muted-foreground">
               Edit your sequence in our intuitive editor to make it perfect.
             </p>
