@@ -24,7 +24,7 @@ export default function SequenceEditorPage() {
   const params = useParams()
   const router = useRouter()
   const { showToast } = useToast()
-  const sequenceId = params.id as string
+  const sequenceId = params?.id as string
   
   const [isLoading, setIsLoading] = useState(true)
   const [sequence, setSequence] = useState<Sequence | null>(null)
@@ -690,7 +690,26 @@ export default function SequenceEditorPage() {
         setIsLoading(true)
         console.log(`Client: Fetching sequence with ID: ${sequenceId}`);
         
-        // Add a timestamp to prevent caching
+        // First try to load from localStorage
+        try {
+          const localSequences = localStorage.getItem("generatedSequences");
+          if (localSequences) {
+            const sequences = JSON.parse(localSequences);
+            const localSequence = sequences.find((seq: any) => seq.id === sequenceId);
+            
+            if (localSequence) {
+              console.log(`Client: Found sequence in localStorage: ${sequenceId}`);
+              setSequence(localSequence);
+              setIsLoading(false);
+              return;
+            }
+          }
+        } catch (localError) {
+          console.error("Error checking localStorage:", localError);
+        }
+        
+        // If not in localStorage, try the API
+        console.log(`Client: Not found in localStorage, trying API for: ${sequenceId}`);
         const response = await fetch(`/api/sequences/${sequenceId}?t=${Date.now()}`);
         
         if (!response.ok) {
