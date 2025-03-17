@@ -150,15 +150,10 @@ export const serverSequenceService = {
         notes: params.additionalNotes,
       }
       
-      // NOTE: We're NOT saving this sequence to Supabase at this point.
-      // It will only be saved if the user explicitly saves it from the editor.
-      
-      // Delete the temporarily created sequence from the database
-      // since we're returning it but not saving it yet
-      await supabase
-        .from("sequences")
-        .delete()
-        .eq("id", generatedSequence.id)
+      // We're now keeping the sequence in the database rather than deleting it
+      // This is more efficient and allows for immediate editing
+      // The sequence is already saved to Supabase by the AI generator
+      console.log(`Sequence ${generatedSequence.id} saved to database and ready for editing`)
       
       return sequence
     } catch (error) {
