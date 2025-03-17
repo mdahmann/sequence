@@ -54,7 +54,7 @@ export function EnhancedSequenceGenerator() {
   // Handler to navigate to sequence editor
   const handleEditSequence = () => {
     if (generatedSequence) {
-      router.push(`/sequence/${generatedSequence.id}`)
+      router.push(`/edit/${generatedSequence.id}`)
     }
   }
   
@@ -102,7 +102,7 @@ export function EnhancedSequenceGenerator() {
       showToast("Sequence generated successfully!", "success")
       
       // Automatically redirect to the editor page
-      router.push(`/sequence/${sequence.id}`)
+      router.push(`/edit/${sequence.id}`)
       
     } catch (error) {
       // Error handling is managed by the service
