@@ -267,7 +267,7 @@ export function EnhancedSlider({
       {/* Slider track */}
       <div 
         ref={trackRef}
-        className="relative h-2 rounded-full bg-gray-200 dark:bg-gray-700 cursor-pointer"
+        className="relative h-2 rounded-full bg-gray-200 dark:bg-gray-700 cursor-pointer w-full"
         onClick={handleTrackClick}
       >
         {/* Filled track */}
@@ -290,6 +290,12 @@ export function EnhancedSlider({
           onMouseDown={handleThumbMouseDown}
           onTouchStart={handleThumbTouchStart}
         />
+      </div>
+
+      {/* Min/Max edge indicators */}
+      <div className="flex justify-between mt-5 text-xs text-gray-500 dark:text-gray-400">
+        <div>15 mins</div>
+        <div>60 mins</div>
       </div>
     </div>
   )
