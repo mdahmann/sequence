@@ -8,7 +8,7 @@ import { useToast } from "@/components/ui-enhanced/toast-provider"
 import { Sequence, SequencePhase, SequencePose } from "@/types/sequence"
 import { cn } from "@/lib/utils"
 import { Skeleton, PoseSkeleton } from "@/components/ui-enhanced/skeleton"
-import { ChevronDown, ChevronRight, ChevronLeft, Plus, Pencil, Download, RotateCcw, RotateCw, History, X } from "lucide-react"
+import { ChevronDown, ChevronRight, ChevronLeft, Plus, Pencil, Download, RotateCcw, RotateCw, History, X, Save } from "lucide-react"
 import { PoseSidebar } from "./components/pose-sidebar"
 import HandDrawnSpiral from "@/components/hand-drawn-spiral"
 
@@ -1151,12 +1151,7 @@ export default function SequenceEditorPage() {
                     className="p-2 bg-vibrant-blue text-white rounded-md hover:bg-vibrant-blue/90 transition-colors"
                     title="Save Settings"
                   >
-                    <img 
-                      src="/images/save.svg" 
-                      alt="Save" 
-                      className="h-5 w-5" 
-                      style={{ filter: "brightness(0) invert(1)", height: "18px", width: "18px" }}
-                    />
+                    <Save className="h-5 w-5" />
                   </button>
                 </>
               ) : (
@@ -1176,12 +1171,7 @@ export default function SequenceEditorPage() {
                     )}
                     title="Save"
                   >
-                    <img 
-                      src="/images/save.svg" 
-                      alt="Save" 
-                      className="h-5 w-5" 
-                      style={{ filter: "brightness(0) invert(1)", height: "18px", width: "18px" }}
-                    />
+                    <Save className="h-5 w-5" />
                   </button>
                 </>
               )}
