@@ -36,11 +36,33 @@ export const serverSequenceService = {
         .single()
       
       if (userError || !user) {
-        console.error(`Server sequence service: User ID ${userId} not found in users table`, userError)
-        throw new Error("USER_NOT_FOUND")
+        // User exists in auth but not in users table - create the user record
+        console.log(`Server sequence service: User ID ${userId} not found in users table, creating new user record`)
+        
+        // Get user details from auth
+        const { data: userData } = await supabase.auth.getUser(userId)
+        
+        // Create user record in users table
+        const { data: newUser, error: createError } = await supabase
+          .from("users")
+          .insert({
+            id: userId,
+            email: userData?.user?.email,
+            created_at: now,
+            updated_at: now
+          })
+          .select()
+          .single()
+        
+        if (createError) {
+          console.error(`Server sequence service: Failed to create user record`, createError)
+          throw new Error(`Failed to create user record: ${createError.message}`)
+        }
+        
+        console.log(`Server sequence service: Created new user record for ${userId}`)
+      } else {
+        console.log(`Server sequence service: Verified user ${userId} exists in database, proceeding with sequence generation`)
       }
-      
-      console.log(`Server sequence service: Verified user ${userId} exists in database, proceeding with sequence generation`)
       
       // Call the existing AI sequence generator
       const { sequence: generatedSequence, error } = await generateAISequence({
