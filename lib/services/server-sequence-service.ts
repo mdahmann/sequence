@@ -1,306 +1,207 @@
-import { createServerSupabaseClient } from "@/lib/supabase"
-import { Sequence, SequenceParams, SequencePhase, SequencePose } from "@/types/sequence"
-import { generateSequence as generateAISequence } from "@/app/api/generate-sequence/handler"
+import { createServerSupabaseClient } from '@/lib/supabase'
+import { cookies } from 'next/headers'
+import { OpenAI } from 'openai'
+import { v4 as uuidv4 } from 'uuid'
+import { 
+  Sequence, 
+  SequencePhase, 
+  SequencePose,
+  SequenceParams
+} from '@/types/sequence'
 
-// Uses the OpenAI integration to generate yoga sequences
+// Create an OpenAI instance
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+})
+
 export const serverSequenceService = {
   async generateSequence(params: SequenceParams): Promise<Sequence> {
-    console.log("Server sequence service: Starting sequence generation")
+    console.log("serverSequenceService: Generating sequence with params:", params)
     
-    // Create server-side Supabase client
+    // Create a server-side Supabase client
     const supabase = createServerSupabaseClient()
     
-    // Create unique IDs
-    const createId = () => crypto.randomUUID()
-    const sequenceId = createId()
-    const now = new Date().toISOString()
+    // Get the current session to check authentication
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    
+    if (sessionError || !session) {
+      console.error("serverSequenceService: Authentication error:", sessionError || "No session found")
+      throw new Error("Authentication required")
+    }
+    
+    console.log("serverSequenceService: Authentication successful, user:", session.user.email)
     
     try {
-      // Check if the user is authenticated before proceeding
-      console.log("Server sequence service: Checking authentication status")
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      // Fetch all poses from the database
+      const { data: poses, error: posesError } = await supabase
+        .from('poses')
+        .select('*')
       
-      if (sessionError) {
-        console.error("Server sequence service: Error getting session:", sessionError)
-        throw new Error(`Authentication error: ${sessionError.message}`)
+      if (posesError || !poses) {
+        console.error("serverSequenceService: Error fetching poses:", posesError || "No poses found")
+        throw new Error("Failed to fetch poses")
       }
       
-      console.log("Server sequence service: Session data:", session ? "Session exists" : "No session")
+      console.log(`serverSequenceService: Successfully fetched ${poses.length} poses from database`)
       
-      if (!session?.user?.id) {
-        console.log("Server sequence service: No valid session found - throwing UNAUTHENTICATED_USER error")
-        throw new Error("UNAUTHENTICATED_USER")
-      }
+      // Prepare the prompt for OpenAI
+      const prompt = this.buildPrompt(params, poses)
       
-      // Use the authenticated user ID
-      const userId = session.user.id
-      console.log(`Server sequence service: Authenticated user ID: ${userId}`)
-      if (session.user.email) {
-        console.log(`Server sequence service: User email: ${session.user.email}`)
-      }
-      
-      // We now skip the users table check entirely since we know the user is authenticated
-      // through Supabase Auth, which is sufficient for generating sequences
-      console.log(`Server sequence service: Using authenticated user ID for sequence generation: ${userId}`)
-      
-      // Call the existing AI sequence generator
-      const { sequence: generatedSequence, error } = await generateAISequence({
-        userId,
-        duration: params.duration,
-        difficulty: params.difficulty,
-        style: params.style,
-        focusArea: params.focus,
-        additionalNotes: params.additionalNotes
+      // Call OpenAI API to generate a sequence
+      console.log("serverSequenceService: Calling OpenAI API")
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4-turbo",
+        temperature: 0.7,
+        messages: [
+          {
+            role: "system",
+            content: "You are a professional yoga instructor tasked with creating appropriate yoga sequences based on user preferences. You will ONLY use poses from the provided database."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        response_format: { type: "json_object" }
       })
       
-      if (error) {
-        console.error("Error generating sequence with AI:", error)
-        throw new Error(`Failed to generate sequence: ${error}`)
+      // Parse the response
+      console.log("serverSequenceService: Received response from OpenAI")
+      const responseContent = completion.choices[0].message.content
+      
+      if (!responseContent) {
+        throw new Error("Empty response from OpenAI")
       }
       
-      if (!generatedSequence) {
-        throw new Error("No sequence was generated")
+      // Parse the JSON response
+      let generatedSequence: any
+      try {
+        generatedSequence = JSON.parse(responseContent)
+      } catch (error) {
+        console.error("serverSequenceService: Error parsing OpenAI response:", error)
+        console.log("serverSequenceService: Raw response:", responseContent)
+        throw new Error("Failed to parse OpenAI response")
       }
       
-      // Fetch the newly created sequence with its poses
-      const { data: sequencePoses, error: posesError } = await supabase
-        .from("sequence_poses")
-        .select(`
-          id, 
-          sequence_id, 
-          pose_id, 
-          position, 
-          duration, 
-          cues,
-          poses (
-            id, 
-            english_name, 
-            sanskrit_name, 
-            category, 
-            difficulty_level, 
-            is_bilateral,
-            side_option,
-            image_url
-          )
-        `)
-        .eq("sequence_id", generatedSequence.id)
-        .order("position")
+      const now = new Date().toISOString();
       
-      if (posesError) {
-        throw new Error(`Failed to fetch sequence poses: ${posesError.message}`)
-      }
-      
-      // Group poses into phases for the sequence
-      const phases: SequencePhase[] = [
-        {
-          id: createId(),
-          name: "Warm Up",
-          description: "Gentle poses to prepare the body",
-          poses: []
-        },
-        {
-          id: createId(),
-          name: "Main Sequence",
-          description: "Core yoga practice",
-          poses: []
-        },
-        {
-          id: createId(),
-          name: "Cool Down",
-          description: "Gentle poses to finish practice",
-          poses: []
-        }
-      ]
-      
-      // Distribute poses among phases
-      const totalPoses = sequencePoses.length
-      const warmUpEnd = Math.floor(totalPoses * 0.25) // First 25% are warm-up
-      const coolDownStart = Math.floor(totalPoses * 0.75) // Last 25% are cool-down
-      
-      sequencePoses.forEach((pose, index) => {
-        // Skip poses with no pose data
-        if (!pose.poses) return
-        
-        // Access the pose data - from Supabase, poses is an object, not an array
-        // Use unknown as intermediate type to fix the TypeScript error
-        const poseData = (pose.poses as unknown) as {
-          id: string
-          english_name: string
-          sanskrit_name?: string
-          category?: string
-          difficulty_level?: string
-          is_bilateral?: boolean
-          side_option?: string
-          image_url?: string
-        }
-        
-        // Create a sequence pose object
-        const sequencePose: SequencePose = {
-          id: pose.id,
-          pose_id: pose.pose_id,
-          name: poseData.english_name,
-          sanskrit_name: poseData.sanskrit_name || undefined,
-          duration_seconds: parseDuration(pose.duration),
-          position: pose.position,
-          image_url: poseData.image_url,
-          cues: pose.cues || [],
-          side: poseData.is_bilateral ? (index % 2 === 0 ? "right" : "left") as "right" | "left" : undefined
-        }
-        
-        // Add to the appropriate phase
-        if (index < warmUpEnd) {
-          phases[0].poses.push(sequencePose)
-        } else if (index >= coolDownStart) {
-          phases[2].poses.push(sequencePose)
-        } else {
-          phases[1].poses.push(sequencePose)
-        }
-      })
-      
-      // Filter out empty phases
-      const nonEmptyPhases = phases.filter(phase => phase.poses.length > 0)
-      
-      // Create the final sequence object
+      // Create a properly formatted sequence object
       const sequence: Sequence = {
-        id: generatedSequence.id,
-        name: generatedSequence.title,
-        description: generatedSequence.description,
+        id: uuidv4(),
+        name: generatedSequence.name || `${params.difficulty} ${params.style} Sequence for ${params.focus}`,
+        description: generatedSequence.description || `A ${params.duration} minute ${params.difficulty} ${params.style} yoga sequence focusing on ${params.focus}.`,
         duration_minutes: params.duration,
         difficulty: params.difficulty,
         style: params.style,
         focus: params.focus,
-        phases: nonEmptyPhases,
+        notes: params.additionalNotes || "",
+        phases: [],
         created_at: now,
         updated_at: now,
-        is_favorite: false,
-        notes: params.additionalNotes,
+        is_favorite: false
       }
       
-      // We're now keeping the sequence in the database rather than deleting it
-      // This is more efficient and allows for immediate editing
-      // The sequence is already saved to Supabase by the AI generator
-      console.log(`Sequence ${generatedSequence.id} saved to database and ready for editing`)
-      
-      return sequence
-    } catch (error) {
-      console.error("Error in generateSequence:", error)
-      
-      // If AI generation fails, fall back to a basic sequence structure
-      // This ensures the app doesn't crash if the AI service is unavailable
-      const phases: SequencePhase[] = [
-        {
-          id: createId(),
-          name: "Warm Up",
-          description: "Gentle poses to prepare the body",
-          poses: [
-            {
-              id: createId(),
-              pose_id: "pose1",
-              name: "Mountain Pose",
-              sanskrit_name: "Tadasana",
-              duration_seconds: 30,
-              position: 1,
-              image_url: "/poses/mountain.jpg"
-            },
-            {
-              id: createId(),
-              pose_id: "pose2",
-              name: "Standing Forward Fold",
-              sanskrit_name: "Uttanasana",
-              duration_seconds: 45,
-              position: 2,
-              image_url: "/poses/forward-fold.jpg"
-            },
-          ]
-        },
-        {
-          id: createId(),
-          name: "Main Sequence",
-          description: "Core yoga practice",
-          poses: [
-            {
-              id: createId(),
-              pose_id: "pose3",
-              name: "Warrior I",
-              sanskrit_name: "Virabhadrasana I",
-              duration_seconds: 60,
-              side: "right",
-              position: 3,
-              image_url: "/poses/warrior-1.jpg"
-            },
-            {
-              id: createId(),
-              pose_id: "pose3",
-              name: "Warrior I",
-              sanskrit_name: "Virabhadrasana I",
-              duration_seconds: 60,
-              side: "left",
-              position: 4,
-              image_url: "/poses/warrior-1.jpg"
-            },
-          ]
-        },
-        {
-          id: createId(),
-          name: "Cool Down",
-          description: "Gentle poses to finish practice",
-          poses: [
-            {
-              id: createId(),
-              pose_id: "pose6",
-              name: "Corpse Pose",
-              sanskrit_name: "Savasana",
-              duration_seconds: 180,
-              position: 8,
-              image_url: "/poses/savasana.jpg"
-            },
-          ]
-        }
-      ]
-      
-      const sequence: Sequence = {
-        id: sequenceId,
-        name: `${params.duration} min ${params.focus} ${params.style} sequence`,
-        description: `A ${params.difficulty} ${params.style} sequence focusing on ${params.focus}`,
-        duration_minutes: params.duration,
-        difficulty: params.difficulty,
-        style: params.style,
-        focus: params.focus,
-        phases: phases,
-        created_at: now,
-        updated_at: now,
-        is_favorite: false,
-        notes: params.additionalNotes,
+      // Process each phase from the generated sequence
+      if (Array.isArray(generatedSequence.phases)) {
+        // Map the generated phases to our Sequence type
+        sequence.phases = generatedSequence.phases.map((phase: any, phaseIndex: number) => {
+          const sequencePhase: SequencePhase = {
+            id: uuidv4(),
+            name: phase.name,
+            description: phase.description || "",
+            poses: []
+          }
+          
+          // Map the poses in each phase
+          if (Array.isArray(phase.poses)) {
+            sequencePhase.poses = phase.poses.map((pose: any, poseIndex: number) => {
+              // Find the matching pose from our database
+              const matchingPose = poses.find(
+                (dbPose) => dbPose.name.toLowerCase() === pose.name.toLowerCase()
+              )
+              
+              // If we couldn't find a matching pose, log a warning but continue
+              if (!matchingPose) {
+                console.warn(`No matching pose found for: ${pose.name}`)
+              }
+              
+              const sequencePose: SequencePose = {
+                id: uuidv4(),
+                pose_id: matchingPose?.id || "unknown",
+                name: pose.name,
+                duration_seconds: pose.duration_seconds || 30,
+                side: pose.side || null,
+                cues: Array.isArray(pose.cues) ? pose.cues.join(", ") : "",
+                position: phaseIndex * 100 + poseIndex + 1, // Generate a position based on phase and pose index
+                sanskrit_name: matchingPose?.sanskrit_name || undefined,
+                image_url: matchingPose?.image_url || undefined
+              }
+              
+              return sequencePose
+            })
+          }
+          
+          return sequencePhase
+        })
       }
       
+      console.log("serverSequenceService: Successfully generated sequence", sequence.name)
       return sequence
+      
+    } catch (error: any) {
+      console.error("serverSequenceService: Error generating sequence:", error.message)
+      throw error
     }
-  }
-}
-
-// Helper function to parse duration string to seconds
-function parseDuration(duration?: string): number {
-  if (!duration) return 30; // Default to 30 seconds
+  },
   
-  // Check if it's a number of breaths
-  const breathsMatch = duration.match(/(\d+)\s*breath/i);
-  if (breathsMatch) {
-    // Assume each breath is about 5 seconds
-    return parseInt(breathsMatch[1]) * 5;
+  buildPrompt(params: SequenceParams, poses: any[]): string {
+    // Create a list of available pose names to include in the prompt
+    const poseNames = poses.map(pose => pose.name).join(", ")
+    
+    return `
+    Create a yoga sequence with the following parameters:
+    - Duration: ${params.duration} minutes
+    - Difficulty: ${params.difficulty}
+    - Style: ${params.style}
+    - Focus Area: ${params.focus}
+    - Additional Notes: ${params.additionalNotes || "None"}
+    
+    IMPORTANT RULES:
+    1. ONLY use poses from this list: ${poseNames}
+    2. Create a sequence with exactly 3 phases: "Warm Up", "Main Sequence", and "Cool Down"
+    3. Each phase should have an appropriate duration that adds up to the total requested duration
+    4. Match the difficulty level requested
+    5. For each pose include:
+       - name (must exactly match a name from the provided list)
+       - duration_seconds (how long to hold the pose)
+       - side (if applicable, either "left", "right", or null)
+       - transition (brief instruction on how to move to this pose)
+       - description (short description of the pose)
+       - cues (array of alignment cues or breathing instructions)
+    
+    Return the sequence as a JSON object with this structure:
+    {
+      "name": "Name of the sequence",
+      "description": "Description of the sequence",
+      "phases": [
+        {
+          "name": "Warm Up",
+          "description": "Description of this phase",
+          "poses": [
+            {
+              "name": "Pose Name",
+              "description": "Description of this pose",
+              "duration_seconds": number,
+              "side": "left" | "right" | null,
+              "transition": "How to transition to this pose",
+              "cues": ["Cue 1", "Cue 2"]
+            },
+            ...more poses
+          ]
+        },
+        ...more phases
+      ]
+    }
+    `
   }
-  
-  // Check if it's seconds
-  const secondsMatch = duration.match(/(\d+)\s*sec/i);
-  if (secondsMatch) {
-    return parseInt(secondsMatch[1]);
-  }
-  
-  // Try to just parse a number
-  const numberMatch = duration.match(/(\d+)/);
-  if (numberMatch) {
-    return parseInt(numberMatch[1]);
-  }
-  
-  // Default
-  return 30;
 } 
