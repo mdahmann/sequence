@@ -9,6 +9,12 @@ export default function Home() {
     <div className="flex flex-col items-center">
       <section
         className="w-full py-12 md:py-24 lg:py-32 flex flex-col items-center text-center bg-background"
+        style={{ 
+          backgroundImage: "url('/images/paper-bg.jpg')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat"
+        }}
       >
         <div className="container px-4 md:px-6">
           <div className="flex flex-col items-center space-y-4 mb-12">

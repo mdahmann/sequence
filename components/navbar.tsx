@@ -78,7 +78,15 @@ export function Navbar() {
   ]
 
   return (
-    <header className="border-b border-muted bg-background">
+    <header 
+      className="border-b border-muted bg-background"
+      style={{ 
+        backgroundImage: "url('/images/paper-bg.jpg')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat"
+      }}
+    >
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
         <div className="flex items-center space-x-2">
           <Link href="/" className="flex items-center space-x-2">
