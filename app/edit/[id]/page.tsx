@@ -41,6 +41,12 @@ export default function SequenceEditorPage() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [isExiting, setIsExiting] = useState(false)
   const [isEditingSettings, setIsEditingSettings] = useState(false)
+  const [editingPhaseId, setEditingPhaseId] = useState<string | null>(null)
+  const [tempPhaseSettings, setTempPhaseSettings] = useState<{
+    id: string;
+    name: string;
+    description: string;
+  } | null>(null)
   const [tempSettings, setTempSettings] = useState<{
     name: string;
     description: string;
@@ -678,13 +684,63 @@ export default function SequenceEditorPage() {
         // Calculate the scroll position to place the phase at the top, with extra 10px offset
         const scrollPosition = phaseElement.offsetTop - mainContent.offsetTop - headerHeight - 10;
         
-        // Smooth scroll to the position
+        // Scroll to the calculated position
         mainContent.scrollTo({
           top: scrollPosition,
           behavior: 'smooth'
         });
       }
     }, 100);
+  }
+  
+  const handleStartEditingPhase = (phaseId: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation(); // Prevent toggling expansion when clicking on name/description
+    }
+    
+    const phase = sequence?.phases.find(p => p.id === phaseId);
+    if (phase) {
+      setTempPhaseSettings({
+        id: phase.id,
+        name: phase.name,
+        description: phase.description || "",
+      });
+      setEditingPhaseId(phaseId);
+      
+      // Ensure the phase is expanded
+      if (!expandedPhases.includes(phaseId)) {
+        setExpandedPhases(prev => [...prev, phaseId]);
+      }
+    }
+  };
+  
+  const handlePhaseSettingsSave = () => {
+    if (!sequence || !tempPhaseSettings) return;
+    
+    const updatedPhases = sequence.phases.map(phase => 
+      phase.id === tempPhaseSettings.id 
+        ? { 
+            ...phase, 
+            name: tempPhaseSettings.name,
+            description: tempPhaseSettings.description 
+          } 
+        : phase
+    );
+    
+    const updatedSequence = {
+      ...sequence,
+      phases: updatedPhases
+    };
+    
+    setSequence(updatedSequence);
+    saveToHistory(updatedSequence, `Updated phase "${tempPhaseSettings.name}"`);
+    
+    setEditingPhaseId(null);
+    setTempPhaseSettings(null);
+  };
+  
+  const handlePhaseSettingsCancel = () => {
+    setEditingPhaseId(null);
   };
   
   // Add this effect to handle 404 cases
