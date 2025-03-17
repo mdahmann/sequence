@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { serverSequenceService } from "@/lib/services/server-sequence-service"
-import { createServerSupabaseClient } from "@/lib/supabase"
+import { createServerClient } from '@supabase/ssr'
 
 // Schema for sequence parameters validation
 const sequenceParamsSchema = z.object({
@@ -15,8 +15,24 @@ const sequenceParamsSchema = z.object({
 export async function POST(req: NextRequest) {
   console.log("Starting POST request to /api/sequence/generate")
   
-  // First, check authentication
-  const supabase = createServerSupabaseClient()
+  // Create a Supabase client using cookies from the request
+  const cookieStore = req.cookies
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value
+        },
+      },
+    }
+  )
+  
+  // Log available cookies for debugging
+  console.log("Available cookies:", cookieStore.getAll().map(c => c.name).join(', '))
+  
+  // Check authentication
   const { data: { session }, error: sessionError } = await supabase.auth.getSession()
   
   if (sessionError) {
@@ -69,7 +85,15 @@ export async function POST(req: NextRequest) {
     
     // Return generated sequence
     console.log("API route: Sequence generated successfully - returning 201")
-    return NextResponse.json({ sequence }, { status: 201 })
+    return NextResponse.json(
+      { sequence }, 
+      { 
+        status: 201,
+        headers: {
+          'Set-Cookie': req.headers.get('cookie') || '',
+        }
+      }
+    )
   } catch (error: any) {
     console.error("API route error:", error.message)
     
