@@ -741,6 +741,7 @@ export default function SequenceEditorPage() {
   
   const handlePhaseSettingsCancel = () => {
     setEditingPhaseId(null);
+    setTempPhaseSettings(null);
   };
   
   // Add this effect to handle 404 cases
@@ -1111,7 +1112,7 @@ export default function SequenceEditorPage() {
                         <div className="w-5 h-5 flex items-center justify-center rounded-full bg-primary/10 text-primary mr-2 text-xs">
                           {index + 1}
                         </div>
-                        <span className="truncate">{phase.name}</span>
+                        <h3 className="text-lg font-medium">{phase.name}</h3>
                       </div>
                     </button>
                   ))}
