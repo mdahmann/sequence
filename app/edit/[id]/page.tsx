@@ -4,10 +4,10 @@ import { useEffect, useState, useRef } from "react"
 import { useParams, useRouter, notFound } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { LoadingSpinner } from "@/components/ui-enhanced/loading-spinner"
-import { Skeleton, PoseSkeleton, SequencePhaseSkeleton } from "@/components/ui-enhanced/skeleton"
 import { useToast } from "@/components/ui-enhanced/toast-provider"
 import { Sequence, SequencePhase, SequencePose } from "@/types/sequence"
 import { cn } from "@/lib/utils"
+import { Skeleton, PoseSkeleton } from "@/components/ui-enhanced/skeleton"
 import { ChevronDown, ChevronRight, ChevronLeft, Plus, Pencil, Download, RotateCcw, RotateCw, History } from "lucide-react"
 import { PoseSidebar } from "./components/pose-sidebar"
 import HandDrawnSpiral from "@/components/hand-drawn-spiral"
@@ -63,10 +63,11 @@ export default function SequenceEditorPage() {
     action: string;
   } | null>(null)
   
-  // Create refs for each phase and UI elements
-  const phaseRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
-  const mainContentRef = useRef<HTMLDivElement | null>(null);
-  const headerRef = useRef<HTMLDivElement | null>(null);
+  // Refs
+  const mainContentRef = useRef<HTMLDivElement | null>(null)
+  const headerRef = useRef<HTMLDivElement | null>(null)
+  const phaseRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const isPoseGenerationInProgress = useRef(false);
   
   // Fetch sequence data from localStorage (beta approach)
   useEffect(() => {
@@ -778,9 +779,6 @@ export default function SequenceEditorPage() {
   // Add effect to complete pose generation if we're viewing a structure-only sequence
   useEffect(() => {
     // Only proceed if we have a structure-only sequence
-    // Add a ref to track if a request is already in progress to prevent duplicates
-    const isPoseGenerationInProgress = useRef(false);
-    
     if (sequence && sequence.structureOnly && isPosesLoading && !isPoseGenerationInProgress.current) {
       console.log(`Client: Generating poses for structure-only sequence: ${sequence.id}`);
       
