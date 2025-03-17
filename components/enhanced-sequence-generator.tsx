@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { EnhancedSlider } from "./ui-enhanced/slider"
 import { LoadingSpinner } from "./ui-enhanced/loading-spinner"
 import { useToast } from "@/components/ui/use-toast"
@@ -30,6 +31,25 @@ const focusOptions = [
   "balance",
   "flexibility",
 ] as const
+
+// Custom auth toast with action buttons
+const AuthRequiredToast = () => {
+  const router = useRouter()
+  
+  return (
+    <div className="flex flex-col gap-4">
+      <p>Please sign in or create an account to generate sequences.</p>
+      <div className="flex justify-end gap-2">
+        <Button variant="outline" size="sm" onClick={() => router.push("/login")}>
+          Sign In
+        </Button>
+        <Button size="sm" onClick={() => router.push("/signup")}>
+          Sign Up
+        </Button>
+      </div>
+    </div>
+  )
+}
 
 export function EnhancedSequenceGenerator() {
   const router = useRouter()
@@ -143,7 +163,7 @@ export function EnhancedSequenceGenerator() {
         console.log("Client-side auth check: User is not authenticated")
         toast({
           title: "Authentication Required",
-          description: "Please sign in or create an account to generate sequences.",
+          description: <AuthRequiredToast />,
           variant: "destructive",
         })
         return
@@ -170,7 +190,6 @@ export function EnhancedSequenceGenerator() {
       
       // Update state
       setGeneratedSequence(sequence)
-      setTabValue("result")
       
       // Save to local storage for beta version
       saveSequenceToLocalStorage(sequence)
@@ -195,7 +214,7 @@ export function EnhancedSequenceGenerator() {
         
         toast({
           title: "Authentication Required",
-          description: "Please sign in or create an account to generate sequences.",
+          description: <AuthRequiredToast />,
           variant: "destructive",
         })
       } else {
@@ -415,71 +434,6 @@ export function EnhancedSequenceGenerator() {
           </div>
         </div>
       </div>
-      
-      {/* Results preview */}
-      {generatedSequence && (
-        <div className="bg-gray-50/80 dark:bg-gray-800/80 border-t border-gray-200 dark:border-gray-700 p-6 backdrop-blur-sm">
-          <div className="flex justify-between items-center mb-4">
-            <div>
-              <h3 className="text-lg font-semibold text-deep-charcoal dark:text-warm-white">
-                {generatedSequence.name}
-              </h3>
-              <p className="text-gray-600 dark:text-gray-300 mt-1">
-                {generatedSequence.description}
-              </p>
-            </div>
-            
-            <motion.button
-              onClick={handleEditSequence}
-              className="px-4 py-2 bg-vibrant-blue text-white font-medium rounded-md shadow-sm hover:bg-vibrant-blue/90 transition-colors"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              Edit Sequence
-            </motion.button>
-          </div>
-          
-          <div className="space-y-4">
-            {generatedSequence.phases.map((phase) => (
-              <div key={phase.id} className="bg-white dark:bg-gray-800 rounded-md shadow-sm p-4">
-                <h4 className="font-medium mb-2 text-deep-charcoal dark:text-warm-white">
-                  {phase.name}
-                </h4>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                  {phase.description}
-                </p>
-                <div className="space-y-2">
-                  {phase.poses.map((pose) => (
-                    <div 
-                      key={pose.id}
-                      className="flex items-center py-2 px-3 bg-gray-50 dark:bg-gray-700 rounded-md"
-                    >
-                      <div className="flex-1">
-                        <div className="font-medium text-deep-charcoal dark:text-warm-white">
-                          {pose.name}
-                          {pose.side && (
-                            <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">
-                              ({pose.side})
-                            </span>
-                          )}
-                        </div>
-                        {pose.sanskrit_name && (
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
-                            {pose.sanskrit_name}
-                          </div>
-                        )}
-                      </div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">
-                        {Math.floor(pose.duration_seconds / 60)}:{(pose.duration_seconds % 60).toString().padStart(2, '0')}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
       
       {/* Pose selection modal */}
       <PoseSelectionModal
