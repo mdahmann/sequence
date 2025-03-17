@@ -128,9 +128,16 @@ export function SequenceGenerator() {
 
       // After successful generation
       if (result.sequence && result.sequence.id) {
-        // If this is just the sequence structure (step 1), store it in localStorage
+        // Get the sequence ID immediately so we can redirect first
+        const sequenceId = result.sequence.id;
+        
+        // Redirect to the editor immediately
+        console.log("SequenceGenerator: Redirecting to editor for sequence:", sequenceId);
+        router.push(`/edit/${sequenceId}`);
+        
+        // Then store in localStorage (this happens after redirect is triggered)
         if (result.structureOnly) {
-          console.log("SequenceGenerator: Received structure-only sequence. Saving to localStorage:", result.sequence.id);
+          console.log("SequenceGenerator: Saving structure-only sequence to localStorage:", sequenceId);
           
           // Save in localStorage
           try {
@@ -150,10 +157,6 @@ export function SequenceGenerator() {
             console.error("SequenceGenerator: Error saving to localStorage:", storageError);
           }
         }
-
-        // Redirect to the flow editor
-        console.log("SequenceGenerator: Redirecting to editor for sequence:", result.sequence.id);
-        router.push(`/edit/${result.sequence.id}`);
       } else {
         setError("Failed to create sequence - no sequence ID returned.")
         toast({

@@ -91,11 +91,8 @@ export async function generateSequence(params: GenerateSequenceParams) {
     
     console.log("Created initial sequence structure with ID:", initialSequenceId);
     
-    // Start the actual pose generation in the background
-    // This would normally be done with a queue or background worker
-    // For simplicity, we'll just return the structure and let the client poll for updates
-    
-    // Return the initial structure immediately
+    // Skip any additional processing and return immediately
+    // This ensures we return to the client as fast as possible
     return { sequence: initialSequence, structureOnly: true };
     
     /* Removed for two-step approach:

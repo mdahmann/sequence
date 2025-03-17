@@ -703,23 +703,32 @@ export default function SequenceEditorPage() {
             if (localSequence) {
               console.log(`Client: Found sequence in localStorage: ${sequenceId}`);
               
+              // Immediately expand all phases when displaying structure
+              let phasesToExpand: string[] = [];
+              if (localSequence.phases && localSequence.phases.length > 0) {
+                phasesToExpand = localSequence.phases.map((phase: any) => phase.id);
+              }
+              
               // Check if sequence has poses or just structure
-              const hasPoses = localSequence.phases.some((phase: any) => 
-                phase.poses && phase.poses.length > 0 && 
-                phase.poses[0].name !== "__loading__"
-              );
+              const isStructureOnly = localSequence.structureOnly === true;
               
               // If we have the structure but poses are loading placeholders
-              if (localSequence.structureOnly) {
+              if (isStructureOnly) {
                 console.log(`Client: Found structure-only sequence, showing skeletons for poses`);
                 setSequence(localSequence);
                 setStructureLoaded(true);
                 setIsPosesLoading(true);
+                setExpandedPhases(phasesToExpand); // Expand all phases
               } else {
                 // Full sequence with poses
                 console.log(`Client: Found complete sequence with poses`);
                 setSequence(localSequence);
                 setIsPosesLoading(false);
+                
+                // Just expand the first phase for complete sequences
+                if (localSequence.phases && localSequence.phases.length > 0) {
+                  setExpandedPhases([localSequence.phases[0].id]);
+                }
               }
               
               setIsLoading(false);
