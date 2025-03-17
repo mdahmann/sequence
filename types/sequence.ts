@@ -4,6 +4,11 @@ export interface SequenceParams {
   style: "vinyasa" | "hatha" | "yin" | "power" | "restorative"
   focus: "full body" | "upper body" | "lower body" | "core" | "balance" | "flexibility"
   additionalNotes?: string
+  peakPose?: {
+    id: string
+    name: string
+    sanskrit_name?: string
+  }
 }
 
 export interface SequencePose {

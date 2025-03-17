@@ -16,6 +16,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { PoseSelectionModal } from "./pose-selection-modal"
+import { Plus } from "lucide-react"
 
 // Define options for each form field
 const difficultyOptions = ["beginner", "intermediate", "advanced"] as const
@@ -35,11 +37,13 @@ export function EnhancedSequenceGenerator() {
   const { supabase, isAuthenticated } = useSupabase()
   
   // Form state
-  const [duration, setDuration] = useState<number>(30)
-  const [difficulty, setDifficulty] = useState<(typeof difficultyOptions)[number]>("intermediate")
+  const [duration, setDuration] = useState<number>(15)
+  const [difficulty, setDifficulty] = useState<(typeof difficultyOptions)[number]>("beginner")
   const [style, setStyle] = useState<(typeof styleOptions)[number]>("vinyasa")
   const [focus, setFocus] = useState<(typeof focusOptions)[number]>("full body")
   const [additionalNotes, setAdditionalNotes] = useState<string>("")
+  const [peakPose, setPeakPose] = useState<{id: string, name: string, sanskrit_name?: string} | null>(null)
+  const [isPoseModalOpen, setIsPoseModalOpen] = useState(false)
   
   // UI state
   const [isGenerating, setIsGenerating] = useState<boolean>(false)
@@ -106,6 +110,25 @@ export function EnhancedSequenceGenerator() {
     }
   }
   
+  // Function to sanitize additional requirements text
+  const sanitizeRequirements = (input: string): string => {
+    // Remove any HTML tags
+    const withoutHtml = input.replace(/<[^>]*>/g, '')
+    
+    // Trim excess whitespace
+    return withoutHtml.replace(/\s+/g, ' ').trim()
+  }
+  
+  // Handle pose selection
+  const handlePoseSelect = (pose: any) => {
+    setPeakPose({
+      id: pose.id,
+      name: pose.name || pose.english_name,
+      sanskrit_name: pose.sanskrit_name
+    })
+    setIsPoseModalOpen(false)
+  }
+  
   // Handle sequence generation
   const handleGenerateSequence = async () => {
     try {
@@ -136,7 +159,8 @@ export function EnhancedSequenceGenerator() {
         difficulty,
         style,
         focus,
-        additionalNotes: additionalNotes.trim() || undefined,
+        additionalNotes: sanitizeRequirements(additionalNotes) || undefined,
+        peakPose: peakPose || undefined,
       }
       
       console.log("Generating sequence with params:", params)
@@ -186,15 +210,32 @@ export function EnhancedSequenceGenerator() {
     }
   }
   
+  // Reset form to default values
+  const handleResetForm = () => {
+    setDuration(15)
+    setDifficulty("beginner")
+    setStyle("vinyasa")
+    setFocus("full body")
+    setAdditionalNotes("")
+    setPeakPose(null)
+  }
+  
   return (
-    <div className="bg-warm-white dark:bg-deep-charcoal-light rounded-lg shadow-sm overflow-hidden">
-      <div className="p-6">
+    <div className="bg-warm-white dark:bg-deep-charcoal-light rounded-lg shadow-sm overflow-hidden"
+      style={{
+        backgroundImage: 'url("/images/paper-bg.jpg")',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }}
+    >
+      <div className="p-6 bg-white/90 dark:bg-deep-charcoal-light/95">
         <div className="space-y-6">
           {/* Duration slider */}
           <div>
-            <label className="block text-sm font-medium mb-2 text-deep-charcoal dark:text-warm-white">
+            {/* <label className="block text-sm font-medium mb-2 text-deep-charcoal dark:text-warm-white">
               Duration (minutes)
-            </label>
+            </label> */}
             <EnhancedSlider
               min={5}
               max={90}
@@ -279,6 +320,53 @@ export function EnhancedSequenceGenerator() {
             </div>
           </div>
           
+          {/* Peak Pose selection */}
+          <div>
+            <label className="block text-sm font-medium mb-2 text-deep-charcoal dark:text-warm-white">
+              Peak Pose (Optional)
+            </label>
+            {peakPose ? (
+              <div className="flex items-center justify-between border border-gray-200 dark:border-gray-700 rounded-md p-3">
+                <div>
+                  <div className="font-medium">{peakPose.name}</div>
+                  {peakPose.sanskrit_name && (
+                    <div className="text-xs text-gray-500 dark:text-gray-400 italic">
+                      {peakPose.sanskrit_name}
+                    </div>
+                  )}
+                </div>
+                <div className="flex space-x-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setIsPoseModalOpen(true)}
+                  >
+                    Change
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => setPeakPose(null)}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                className="w-full justify-start text-gray-600 dark:text-gray-300 border-dashed"
+                onClick={() => setIsPoseModalOpen(true)}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Select a peak pose
+              </Button>
+            )}
+            <p className="text-xs text-gray-500 mt-1">
+              The sequence will build towards this pose as the highlight
+            </p>
+          </div>
+          
           {/* Additional notes */}
           <div>
             <label className="block text-sm font-medium mb-2 text-deep-charcoal dark:text-warm-white">
@@ -287,18 +375,31 @@ export function EnhancedSequenceGenerator() {
             <textarea
               value={additionalNotes}
               onChange={(e) => setAdditionalNotes(e.target.value)}
-              placeholder="Any specific requirements or preferences..."
+              placeholder="E.g., 'Include shoulder openers', 'Focus on hip mobility', 'Avoid inversions'"
               className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-vibrant-blue/50 dark:bg-gray-800 dark:text-gray-100"
               rows={3}
+              maxLength={250}
             />
+            <p className="text-xs text-gray-500 mt-1">
+              {250 - (additionalNotes?.length || 0)} characters remaining
+            </p>
           </div>
           
           {/* Generate button */}
-          <div>
+          <div className="flex items-center gap-3">
+            <motion.button
+              onClick={handleResetForm}
+              className="py-3 px-4 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-deep-charcoal dark:text-warm-white font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400/50 focus:ring-offset-2 transition-colors"
+              whileTap={{ scale: 0.98 }}
+              whileHover={{ scale: 1.02 }}
+            >
+              Clear Filters
+            </motion.button>
+            
             <motion.button
               onClick={handleGenerateSequence}
               disabled={isGenerating}
-              className="w-full py-3 px-4 bg-vibrant-blue hover:bg-vibrant-blue/90 text-white font-medium rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-vibrant-blue/50 focus:ring-offset-2 disabled:opacity-70 transition-colors"
+              className="flex-1 py-3 px-4 bg-vibrant-blue hover:bg-vibrant-blue/90 text-white font-medium rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-vibrant-blue/50 focus:ring-offset-2 disabled:opacity-70 transition-colors"
               whileTap={{ scale: 0.98 }}
               whileHover={{ scale: 1.02 }}
             >
@@ -317,7 +418,7 @@ export function EnhancedSequenceGenerator() {
       
       {/* Results preview */}
       {generatedSequence && (
-        <div className="bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700 p-6">
+        <div className="bg-gray-50/80 dark:bg-gray-800/80 border-t border-gray-200 dark:border-gray-700 p-6 backdrop-blur-sm">
           <div className="flex justify-between items-center mb-4">
             <div>
               <h3 className="text-lg font-semibold text-deep-charcoal dark:text-warm-white">
@@ -379,6 +480,14 @@ export function EnhancedSequenceGenerator() {
           </div>
         </div>
       )}
+      
+      {/* Pose selection modal */}
+      <PoseSelectionModal
+        isOpen={isPoseModalOpen}
+        onClose={() => setIsPoseModalOpen(false)}
+        onPoseSelect={handlePoseSelect}
+        title="Select a Peak Pose"
+      />
     </div>
   )
 } 

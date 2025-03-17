@@ -36,16 +36,9 @@ export default function Home() {
                 </Link>
               </Button>
 
-              <Button asChild variant="outline" size="lg" className="text-primary border-primary">
-                <Link href="/preview" className="flex items-center">
-                  <Eye className="mr-2 h-4 w-4" />
-                  View Example
-                </Link>
-              </Button>
-              
               <Button asChild variant="outline" size="lg">
-                <Link href="/flows" className="flex items-center">
-                  View Saved Flows
+                <Link href="/signup" className="flex items-center">
+                  Sign Up
                 </Link>
               </Button>
             </div>
@@ -53,7 +46,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="w-full py-12 md:py-24 bg-white">
+      <section className="w-full py-12 md:py-24">
         <div className="container px-4 md:px-6">
           <h2 className="text-3xl font-serif font-normal text-center mb-12">
             Create flowing sequences with intuitive design

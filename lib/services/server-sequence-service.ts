@@ -338,16 +338,22 @@ export const serverSequenceService = {
     // Add yoga guidelines based on style and focus
     const yogaGuidelines = this.getYogaGuidelines(params.style, params.focus, params.difficulty);
     
+    // Build peak pose instruction if provided
+    const peakPoseInstruction = params.peakPose 
+      ? `\n- Peak Pose: ${params.peakPose.name}${params.peakPose.sanskrit_name ? ` (${params.peakPose.sanskrit_name})` : ''}`
+      : '';
+    
     return `
     Create a yoga sequence with the following parameters:
     - Duration: ${params.duration} minutes
     - Difficulty: ${params.difficulty}
     - Style: ${params.style}
-    - Focus Area: ${params.focus}
+    - Focus Area: ${params.focus}${peakPoseInstruction}
     - Additional Notes: ${params.additionalNotes || "None"}
     
     YOGA GUIDELINES:
     ${yogaGuidelines}
+    ${params.peakPose ? `\nIMPORTANT: This sequence should build towards the peak pose "${params.peakPose.name}" in the Main Sequence phase. Include appropriate preparatory poses and counter poses.` : ''}
     
     IMPORTANT RULES:
     1. ONLY use poses from this list: ${poseNames}
@@ -361,6 +367,7 @@ export const serverSequenceService = {
        - transition (brief instruction on how to move to this pose)
        - description (short description of the pose)
        - cues (array of alignment cues or breathing instructions)
+    ${params.peakPose ? `6. Include the peak pose "${params.peakPose.name}" in the Main Sequence phase, with proper preparation and counter poses` : ''}
     
     Return the sequence as a JSON object with this structure:
     {

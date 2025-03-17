@@ -202,7 +202,7 @@ export function EnhancedSlider({
   return (
     <div className={`relative ${className}`}>
       {/* Title */}
-      <div className="font-medium text-gray-700 dark:text-gray-300 mb-4">
+      <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">
         Duration (minutes)
       </div>
       
