@@ -6,6 +6,8 @@ import { generateSequence as generateAISequence } from "@/app/api/generate-seque
 export const serverSequenceService = {
   async generateSequence(params: SequenceParams): Promise<Sequence> {
     console.log("Server sequence service: Starting sequence generation")
+    
+    // Create server-side Supabase client
     const supabase = createServerSupabaseClient()
     
     // Create unique IDs
@@ -16,7 +18,14 @@ export const serverSequenceService = {
     try {
       // Check if the user is authenticated before proceeding
       console.log("Server sequence service: Checking authentication status")
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
+      if (sessionError) {
+        console.error("Server sequence service: Error getting session:", sessionError)
+        throw new Error(`Authentication error: ${sessionError.message}`)
+      }
+      
+      console.log("Server sequence service: Session data:", session ? "Session exists" : "No session")
       
       if (!session?.user?.id) {
         console.log("Server sequence service: No valid session found - throwing UNAUTHENTICATED_USER error")
@@ -26,6 +35,9 @@ export const serverSequenceService = {
       // Use the authenticated user ID
       const userId = session.user.id
       console.log(`Server sequence service: Authenticated user ID: ${userId}`)
+      if (session.user.email) {
+        console.log(`Server sequence service: User email: ${session.user.email}`)
+      }
       
       // We now skip the users table check entirely since we know the user is authenticated
       // through Supabase Auth, which is sufficient for generating sequences

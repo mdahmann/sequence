@@ -9,6 +9,7 @@ import { useToast } from "./ui-enhanced/toast-provider"
 import { clientSequenceService, APIError } from "@/lib/services/client-sequence-service"
 import { Sequence, SequenceParams } from "@/types/sequence"
 import { cn } from "@/lib/utils"
+import { useSupabase } from "@/components/providers"
 
 // Define options for each form field
 const difficultyOptions = [
@@ -51,6 +52,9 @@ export function EnhancedSequenceGenerator() {
   // Use toast notification system
   const { showToast } = useToast()
   
+  // Use Supabase
+  const { supabase, isAuthenticated } = useSupabase()
+  
   // Handler to navigate to sequence editor
   const handleEditSequence = () => {
     if (generatedSequence) {
@@ -86,6 +90,32 @@ export function EnhancedSequenceGenerator() {
     setGeneratedSequence(null)
     
     try {
+      // First check if user is already logged in using the useSupabase hook
+      // This is a client-side check before making the API call
+      if (!isAuthenticated) {
+        console.log("Client-side auth check: User not authenticated");
+        showToast(
+          "Please sign in or create an account to generate sequences",
+          "auth",
+          12000, // Show for longer (12 seconds)
+          "center", // Display in center of screen
+          [
+            {
+              label: "Sign In",
+              onClick: () => router.push("/login")
+            },
+            {
+              label: "Sign Up",
+              onClick: () => router.push("/signup")
+            }
+          ]
+        );
+        setIsGenerating(false);
+        return;
+      }
+      
+      console.log("Client-side auth check: User is authenticated");
+      
       const params: SequenceParams = {
         duration,
         difficulty: difficulty as "beginner" | "intermediate" | "advanced",
