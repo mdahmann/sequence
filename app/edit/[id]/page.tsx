@@ -579,15 +579,27 @@ export default function SequenceEditorPage() {
   const handleDndDragOver = (event: DragOverEvent) => {
     const { active, over } = event;
     
-    if (!over) return;
+    if (!over) {
+      setDragOverPhaseId(null);
+      return;
+    }
     
-    // If hovering over a different phase, highlight it
+    // Find which phase the over item belongs to
+    let overPhaseId = null;
+    
+    // If over element is a pose, find its phase
     if (sequence) {
       for (const phase of sequence.phases) {
+        // If directly over a pose, check that
         if (phase.poses.some(pose => pose.id === over.id)) {
-          setDragOverPhaseId(phase.id);
+          overPhaseId = phase.id;
           break;
         }
+      }
+      
+      // If we found the over phase, highlight it
+      if (overPhaseId) {
+        setDragOverPhaseId(overPhaseId);
       }
     }
   };
@@ -611,26 +623,33 @@ export default function SequenceEditorPage() {
     let sourcePoseIndex = -1;
     let destinationPoseIndex = -1;
     
-    // Find the phase and pose indices
+    // Find the source phase and pose indices
     sequence.phases.forEach((phase, phaseIndex) => {
-      phase.poses.forEach((pose, poseIndex) => {
-        if (pose.id === active.id) {
-          sourcePhaseId = phase.id;
-          sourcePhaseIndex = phaseIndex;
-          sourcePoseIndex = poseIndex;
-        }
-        if (pose.id === over.id) {
-          destinationPhaseId = phase.id;
-          destinationPhaseIndex = phaseIndex;
-          destinationPoseIndex = poseIndex;
-        }
-      });
+      const poseIndex = phase.poses.findIndex(p => p.id === active.id);
+      if (poseIndex !== -1) {
+        sourcePhaseId = phase.id;
+        sourcePhaseIndex = phaseIndex;
+        sourcePoseIndex = poseIndex;
+      }
     });
     
-    // If we couldn't find the phases or poses, do nothing
-    if (sourcePhaseId === null || destinationPhaseId === null || 
-        sourcePhaseIndex === -1 || destinationPhaseIndex === -1 || 
-        sourcePoseIndex === -1 || destinationPoseIndex === -1) {
+    // Find the destination phase and pose indices
+    sequence.phases.forEach((phase, phaseIndex) => {
+      const poseIndex = phase.poses.findIndex(p => p.id === over.id);
+      if (poseIndex !== -1) {
+        destinationPhaseId = phase.id;
+        destinationPhaseIndex = phaseIndex;
+        destinationPoseIndex = poseIndex;
+      }
+    });
+    
+    // If we couldn't find the source, do nothing
+    if (sourcePhaseId === null || sourcePhaseIndex === -1 || sourcePoseIndex === -1) {
+      return;
+    }
+    
+    // If destination is not found, it might be an empty phase or something else, so don't handle that case
+    if (destinationPhaseId === null || destinationPhaseIndex === -1 || destinationPoseIndex === -1) {
       return;
     }
     
@@ -1497,65 +1516,75 @@ export default function SequenceEditorPage() {
 
           {/* Phases */}
           <div className="space-y-6 pb-64">
-            {sequence.phases.map((phase, phaseIndex) => (
-              <div
-                key={phase.id}
-                ref={el => {
-                  phaseRefs.current[phase.id] = el;
-                  return undefined;
-                }}
-                className={cn(
-                  "bg-warm-white dark:bg-deep-charcoal-light rounded-lg shadow-sm overflow-hidden",
-                  dragOverPhaseId === phase.id && "ring-2 ring-vibrant-blue"
-                )}
-              >
-                <button
-                  onClick={() => togglePhaseExpansion(phase.id)}
-                  className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-800"
-                >
-                  <div className="flex items-center">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary mr-3">
-                      {phaseIndex + 1}
-                    </div>
-                    <h3 className="text-lg font-medium">{phase.name}</h3>
-                  </div>
-                  {expandedPhases.includes(phase.id) ? (
-                    <ChevronDown className="h-5 w-5" />
-                  ) : (
-                    <ChevronRight className="h-5 w-5" />
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragOver={handleDndDragOver}
+              onDragEnd={handleDragEnd}
+              modifiers={[restrictToVerticalAxis]}
+            >
+              {sequence?.phases.map((phase, phaseIndex) => (
+                <div
+                  key={phase.id}
+                  ref={el => {
+                    phaseRefs.current[phase.id] = el;
+                    return undefined;
+                  }}
+                  className={cn(
+                    "bg-warm-white dark:bg-deep-charcoal-light rounded-lg shadow-sm overflow-hidden transition-all duration-200",
+                    dragOverPhaseId === phase.id && "ring-2 ring-vibrant-blue shadow-md"
                   )}
-                </button>
-
-                {expandedPhases.includes(phase.id) && (
-                  <div 
-                    className="px-6 pb-4"
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      handleDragOverLegacy(e, phase.id);
-                    }}
-                    onDragLeave={handleDragLeave}
-                    onDrop={(e) => handleDrop(e, phase.id)}
+                  data-phase-id={phase.id}
+                >
+                  <button
+                    onClick={() => togglePhaseExpansion(phase.id)}
+                    className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-800"
                   >
-                    <p className="text-gray-600 dark:text-gray-400 mb-4 ml-11">
-                      {phase.description}
-                    </p>
+                    <div className="flex items-center">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary mr-3">
+                        {phaseIndex + 1}
+                      </div>
+                      <h3 className="text-lg font-medium">{phase.name}</h3>
+                    </div>
+                    {expandedPhases.includes(phase.id) ? (
+                      <ChevronDown className="h-5 w-5" />
+                    ) : (
+                      <ChevronRight className="h-5 w-5" />
+                    )}
+                  </button>
 
-                    <div className="space-y-3 ml-11">
-                      {isPosesLoading ? (
-                        // Show skeleton UI when poses are loading
-                        Array(3).fill(0).map((_, i) => (
-                          <PoseSkeleton key={i} />
-                        ))
-                      ) : (
-                        // Show actual poses with DndKit
-                        <DndContext
-                          sensors={sensors}
-                          collisionDetection={closestCenter}
-                          onDragStart={handleDragStart}
-                          onDragOver={handleDndDragOver}
-                          onDragEnd={handleDragEnd}
-                          modifiers={[restrictToVerticalAxis]}
-                        >
+                  {expandedPhases.includes(phase.id) && (
+                    <div 
+                      className="px-6 pb-4"
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        handleDragOverLegacy(e, phase.id);
+                      }}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, phase.id)}
+                    >
+                      <p className="text-gray-600 dark:text-gray-400 mb-4 ml-11">
+                        {phase.description}
+                      </p>
+
+                      <div className="space-y-3 ml-11">
+                        {isPosesLoading ? (
+                          // Show skeleton UI when poses are loading
+                          Array(3).fill(0).map((_, i) => (
+                            <PoseSkeleton key={i} />
+                          ))
+                        ) : phase.poses.length === 0 ? (
+                          // Empty state for phase with no poses
+                          <div 
+                            className="h-20 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg flex items-center justify-center text-gray-500 dark:text-gray-400"
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => handleDrop(e, phase.id)}
+                          >
+                            Drop poses here
+                          </div>
+                        ) : (
+                          // Show actual poses with SortableContext
                           <SortableContext 
                             items={phase.poses.map(pose => pose.id)}
                             strategy={verticalListSortingStrategy}
@@ -1577,13 +1606,26 @@ export default function SequenceEditorPage() {
                               </div>
                             ))}
                           </SortableContext>
-                        </DndContext>
-                      )}
+                        )}
+                      </div>
                     </div>
+                  )}
+                </div>
+              ))}
+              
+              {/* DragOverlay for showing the dragged item */}
+              <DragOverlay>
+                {activeId && (
+                  <div className="opacity-70">
+                    <SortablePoseItem
+                      id={activeId}
+                      pose={findPoseById(activeId) || { id: '', pose_id: '', name: '', duration_seconds: 0, position: 0 }}
+                      index={0}
+                    />
                   </div>
                 )}
-              </div>
-            ))}
+              </DragOverlay>
+            </DndContext>
           </div>
         </div>
       </main>
