@@ -71,64 +71,68 @@ export async function POST(req: NextRequest) {
         console.log("API route: Got token from header, length:", token.length);
         
         try {
-          // First, try to verify the token without setting the session
+          // Verify the token and get the user - this doesn't require setting a session
           const { data: verifyData, error: verifyError } = await supabase.auth.getUser(token);
           
           if (verifyError) {
             console.error("API route: Token verification error:", verifyError);
           } else if (verifyData?.user) {
-            console.log("API route: Token verified successfully for user:", verifyData.user.id);
+            const verifiedUser = verifyData.user;
+            console.log("API route: Token verified successfully for user:", verifiedUser.id);
             
-            // Set session with the token
-            const { data: sessionData, error: setSessionError } = await supabase.auth.setSession({
-              access_token: token,
-              refresh_token: ""
-            });
-            
-            if (setSessionError) {
-              console.error("API route: Error setting session with token:", setSessionError);
-            } else {
-              console.log("API route: Session set successfully with token");
-            }
-            
-            // Try to get the user again to verify authentication worked
-            const { data: userData } = await supabase.auth.getUser();
-            
-            if (userData?.user) {
-              console.log("API route: Successfully authenticated with token from header");
-              console.log("API route: User ID from token:", userData.user.id);
+            // We now have a verified user without needing to set a session
+            // Continue with the authenticated user directly
+            try {
+              // Parse and validate request body
+              const body = await req.json()
+              const validatedParams = sequenceParamsSchema.safeParse(body)
               
-              // Continue with the authenticated user
-              try {
-                // Parse and validate request body
-                const body = await req.json()
-                const validatedParams = sequenceParamsSchema.safeParse(body)
-                
-                if (!validatedParams.success) {
-                  console.log("API route: Invalid parameters - returning 400")
-                  return NextResponse.json(
-                    { error: "Invalid parameters", details: validatedParams.error.format() },
-                    { status: 400 }
-                  )
-                }
-                
-                // Generate sequence with the authenticated user
-                console.log("API route: Generating sequence with token auth...")
-                const sequence = await serverSequenceService.generateSequence(validatedParams.data)
-                
-                // Return generated sequence
-                console.log("API route: Sequence generated successfully - returning 201")
+              if (!validatedParams.success) {
+                console.log("API route: Invalid parameters - returning 400")
                 return NextResponse.json(
-                  { sequence }, 
-                  { status: 201 }
-                )
-              } catch (error: any) {
-                console.error("API route token error:", error.message)
-                return NextResponse.json(
-                  { error: "Token processing error", message: error.message },
-                  { status: 500 }
+                  { error: "Invalid parameters", details: validatedParams.error.format() },
+                  { status: 400 }
                 )
               }
+              
+              // Generate sequence with the authenticated user
+              console.log("API route: Generating sequence with token auth...")
+              
+              // Create a new Supabase client with the token for this request only
+              const serviceClient = createServerClient(
+                process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                process.env.SUPABASE_SERVICE_ROLE_KEY!,
+                {
+                  cookies: {
+                    get(name: string) { return null },
+                    set(name: string, value: string, options: any) {},
+                    remove(name: string, options: any) {},
+                  },
+                  global: {
+                    headers: {
+                      Authorization: `Bearer ${token}`
+                    }
+                  }
+                }
+              )
+              
+              // Generate the sequence passing in the verified user ID directly
+              const sequence = await serverSequenceService.generateSequence(
+                validatedParams.data
+              )
+              
+              // Return generated sequence
+              console.log("API route: Sequence generated successfully - returning 201")
+              return NextResponse.json(
+                { sequence }, 
+                { status: 201 }
+              )
+            } catch (error: any) {
+              console.error("API route token error:", error.message)
+              return NextResponse.json(
+                { error: "Token processing error", message: error.message },
+                { status: 500 }
+              )
             }
           }
         } catch (tokenError) {

@@ -21,24 +21,8 @@ export const serverSequenceService = {
     // Create a server-side Supabase client
     const supabase = createServerSupabaseClient()
     
-    // Get the current session to check authentication
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-    
-    if (sessionError || !session) {
-      console.error("serverSequenceService: Authentication error:", sessionError || "No session found")
-      throw new Error("Authentication required")
-    }
-    
-    console.log("serverSequenceService: Authentication successful, user:", 
-      {
-        id: session.user.id,
-        email: session.user.email,
-        provider: session.user.app_metadata?.provider || 'unknown'
-      }
-    )
-    
     try {
-      // Fetch all poses from the database
+      // Fetch all poses from the database without requiring authentication
       const { data: poses, error: posesError } = await supabase
         .from('poses')
         .select('*')
