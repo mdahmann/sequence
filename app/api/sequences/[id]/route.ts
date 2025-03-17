@@ -3,11 +3,11 @@ import { createServerSupabaseClient } from '@/lib/supabase'
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
-    // Ensure params is properly resolved before using
-    const id = params?.id
+    // Properly await the params
+    const { id } = context.params;
     
     if (!id) {
       return NextResponse.json(
