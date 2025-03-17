@@ -79,8 +79,8 @@ export default function SequenceEditorPage() {
         router.push('/')
         return
       }
-
-      const sequences = JSON.parse(sequencesJson)
+      
+        const sequences = JSON.parse(sequencesJson)
       const foundSequence = sequences.find((seq: Sequence) => seq.id === sequenceId)
       
       if (!foundSequence) {
@@ -418,16 +418,16 @@ export default function SequenceEditorPage() {
     const updatedPhases = sequence.phases.map(phase => ({
       ...phase,
       poses: phase.poses.map(pose => {
-        if (pose.id === poseId) {
+      if (pose.id === poseId) {
           return {
             ...pose,
             side: pose.side === "left" ? ("right" as const) : ("left" as const)
           }
-        }
-        return pose
-      })
+      }
+      return pose
+    })
     }))
-
+    
     const updatedSequence = {
       ...sequence,
       phases: updatedPhases
@@ -467,18 +467,18 @@ export default function SequenceEditorPage() {
 
   const handleSave = async () => {
     if (!sequence) return
-
+    
     try {
       const sequencesJson = localStorage.getItem("generatedSequences")
       const sequences = sequencesJson ? JSON.parse(sequencesJson) : []
       
-      const updatedSequences = sequences.map((seq: Sequence) => 
-        seq.id === sequence.id ? sequence : seq
-      )
+        const updatedSequences = sequences.map((seq: Sequence) => 
+          seq.id === sequence.id ? sequence : seq
+        )
       
-      localStorage.setItem("generatedSequences", JSON.stringify(updatedSequences))
+        localStorage.setItem("generatedSequences", JSON.stringify(updatedSequences))
       setHasUnsavedChanges(false)
-      showToast("Sequence saved successfully", "success")
+        showToast("Sequence saved successfully", "success")
       
       // Add save action to history
       saveToHistory(sequence, "Saved sequence")
@@ -725,7 +725,7 @@ export default function SequenceEditorPage() {
         {!isLeftSidebarOpen && (
           /* Icon buttons when sidebar is collapsed */
           <div className="py-4 flex flex-col items-center space-y-6">
-            <button
+          <button 
               onClick={() => {
                 setActiveSidebarTab('phases');
                 setIsLeftSidebarOpen(true);
@@ -741,11 +741,11 @@ export default function SequenceEditorPage() {
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
+            </svg>
               {activeSidebarTab === 'phases' && (
                 <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-6 bg-vibrant-blue rounded-r-full"></div>
               )}
-            </button>
+          </button>
             <button
               onClick={() => {
                 setActiveSidebarTab('history');
@@ -819,7 +819,7 @@ export default function SequenceEditorPage() {
                 <div className="flex justify-between items-center mb-3">
                   <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Edit History</div>
                   <div className="flex items-center space-x-1">
-                    <button 
+          <button
                       onClick={handleUndo}
                       disabled={currentHistoryIndex <= 0}
                       className={cn(
@@ -844,8 +844,8 @@ export default function SequenceEditorPage() {
                       title="Redo (Ctrl+Y)"
                     >
                       <RotateCw className="h-4 w-4" />
-                    </button>
-                  </div>
+          </button>
+        </div>
                 </div>
                 <div className="space-y-1 max-h-full">
                   {historyStack.map((historyItem, index) => {
@@ -854,10 +854,10 @@ export default function SequenceEditorPage() {
                     const timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                     
                     return (
-                      <button
+            <button
                         key={index}
                         onClick={() => navigateHistory(index)}
-                        className={cn(
+              className={cn(
                           "w-full text-left px-3 py-2 text-xs transition-colors rounded-md",
                           index === currentHistoryIndex 
                             ? "bg-vibrant-blue/10 text-vibrant-blue"
@@ -868,7 +868,7 @@ export default function SequenceEditorPage() {
                           <span className="truncate">{historyItem.action}</span>
                           <span className="text-xs text-gray-500 ml-1 flex-shrink-0">{timeString}</span>
                         </div>
-                      </button>
+            </button>
                     );
                   })}
                 </div>
@@ -879,10 +879,10 @@ export default function SequenceEditorPage() {
                 <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2 px-3">Sequence Phases</div>
                 <div className="space-y-1">
                   {sequence.phases.map((phase, index) => (
-                    <button
+            <button
                       key={phase.id}
                       onClick={() => handlePhaseSelect(index, phase.id)}
-                      className={cn(
+              className={cn(
                         "w-full text-left px-3 py-2 rounded-md transition-colors whitespace-nowrap",
                         selectedPhaseIndex === index 
                           ? "bg-vibrant-blue/10 text-vibrant-blue"
@@ -895,10 +895,10 @@ export default function SequenceEditorPage() {
                         </div>
                         <span className="truncate">{phase.name}</span>
                       </div>
-                    </button>
+            </button>
                   ))}
-                </div>
-              </div>
+          </div>
+        </div>
             )}
           </div>
         </div>
@@ -1010,7 +1010,7 @@ export default function SequenceEditorPage() {
         {/* Sequence Content */}
         <div className="p-6">
           {/* Stats Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {/* Duration */}
             <div 
               className={cn(
@@ -1019,7 +1019,7 @@ export default function SequenceEditorPage() {
               )}
               onClick={isEditingSettings ? undefined : handleStartEditing}
             >
-              <div className="text-sm text-gray-500 dark:text-gray-400">Duration</div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">Duration</div>
               {isEditingSettings ? (
                 <div>
                   <input
@@ -1043,7 +1043,7 @@ export default function SequenceEditorPage() {
               )}
               onClick={isEditingSettings ? undefined : handleStartEditing}
             >
-              <div className="text-sm text-gray-500 dark:text-gray-400">Difficulty</div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">Difficulty</div>
               {isEditingSettings ? (
                 <select
                   value={tempSettings?.difficulty || ''}
@@ -1055,9 +1055,9 @@ export default function SequenceEditorPage() {
                   <option value="advanced">Advanced</option>
                 </select>
               ) : (
-                <div className="text-xl font-semibold capitalize">{sequence.difficulty}</div>
+                  <div className="text-xl font-semibold capitalize">{sequence.difficulty}</div>
               )}
-            </div>
+                </div>
             
             {/* Style */}
             <div 
@@ -1067,7 +1067,7 @@ export default function SequenceEditorPage() {
               )}
               onClick={isEditingSettings ? undefined : handleStartEditing}
             >
-              <div className="text-sm text-gray-500 dark:text-gray-400">Style</div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">Style</div>
               {isEditingSettings ? (
                 <select
                   value={tempSettings?.style || ''}
@@ -1081,9 +1081,9 @@ export default function SequenceEditorPage() {
                   <option value="restorative">Restorative</option>
                 </select>
               ) : (
-                <div className="text-xl font-semibold capitalize">{sequence.style}</div>
+                  <div className="text-xl font-semibold capitalize">{sequence.style}</div>
               )}
-            </div>
+                </div>
             
             {/* Focus */}
             <div 
@@ -1093,7 +1093,7 @@ export default function SequenceEditorPage() {
               )}
               onClick={isEditingSettings ? undefined : handleStartEditing}
             >
-              <div className="text-sm text-gray-500 dark:text-gray-400">Focus</div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">Focus</div>
               {isEditingSettings ? (
                 <select
                   value={tempSettings?.focus || ''}
@@ -1110,11 +1110,11 @@ export default function SequenceEditorPage() {
                   <option value="relaxation">Relaxation</option>
                 </select>
               ) : (
-                <div className="text-xl font-semibold capitalize">{sequence.focus}</div>
+                  <div className="text-xl font-semibold capitalize">{sequence.focus}</div>
               )}
-            </div>
-          </div>
-
+                </div>
+              </div>
+              
           {isEditingSettings && (
             <div className="bg-warm-white dark:bg-deep-charcoal-light rounded-lg p-4 shadow-sm mb-6">
               <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">Description</div>
@@ -1131,12 +1131,12 @@ export default function SequenceEditorPage() {
           <div className="space-y-6 pb-64">
             {sequence.phases.map((phase, phaseIndex) => (
               <div
-                key={phase.id}
+                      key={phase.id}
                 ref={el => {
                   phaseRefs.current[phase.id] = el;
                   return undefined;
                 }}
-                className={cn(
+                      className={cn(
                   "bg-warm-white dark:bg-deep-charcoal-light rounded-lg shadow-sm overflow-hidden",
                   dragOverPhaseId === phase.id && "ring-2 ring-vibrant-blue"
                 )}
@@ -1148,15 +1148,15 @@ export default function SequenceEditorPage() {
                   <div className="flex items-center">
                     <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary mr-3">
                       {phaseIndex + 1}
-                    </div>
+                </div>
                     <h3 className="text-lg font-medium">{phase.name}</h3>
-                  </div>
+              </div>
                   {expandedPhases.includes(phase.id) ? (
                     <ChevronDown className="h-5 w-5" />
                   ) : (
                     <ChevronRight className="h-5 w-5" />
                   )}
-                </button>
+                    </button>
 
                 {expandedPhases.includes(phase.id) && (
                   <div 
@@ -1171,42 +1171,42 @@ export default function SequenceEditorPage() {
 
                     <div className="space-y-3 ml-11">
                       {phase.poses.map((pose, index) => (
-                        <motion.div
-                          key={pose.id}
-                          layoutId={pose.id}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ 
-                            type: "spring", 
-                            stiffness: 500, 
-                            damping: 30,
-                            delay: index * 0.05 
-                          }}
-                          className={cn(
+                    <motion.div
+                      key={pose.id}
+                      layoutId={pose.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ 
+                        type: "spring", 
+                        stiffness: 500, 
+                        damping: 30,
+                        delay: index * 0.05 
+                      }}
+                      className={cn(
                             "bg-warm-white dark:bg-deep-charcoal-light rounded-lg shadow-sm overflow-hidden w-full",
                             isDragging && draggedPose?.id === pose.id ? "border-2 border-vibrant-blue" : "",
                             pose.side === "left" ? "border-l-4 border-l-blue-400" : "",
                             pose.side === "right" ? "border-r-4 border-r-purple-400" : ""
-                          )}
-                          drag="y"
-                          dragConstraints={{ top: 0, bottom: 0 }}
-                          dragElastic={0.1}
-                          onDragStart={() => {
-                            setIsDragging(true)
-                            setDraggedPose(pose)
-                          }}
-                          onDragEnd={() => {
-                            setIsDragging(false)
-                            setDraggedPose(null)
-                          }}
-                        >
-                          <div className="flex items-stretch">
-                            {/* Drag Handle */}
-                            <div className="bg-gray-100 dark:bg-gray-800 flex items-center justify-center px-3 cursor-move">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-                              </svg>
-                            </div>
+                      )}
+                      drag="y"
+                      dragConstraints={{ top: 0, bottom: 0 }}
+                      dragElastic={0.1}
+                      onDragStart={() => {
+                        setIsDragging(true)
+                        setDraggedPose(pose)
+                      }}
+                      onDragEnd={() => {
+                        setIsDragging(false)
+                        setDraggedPose(null)
+                      }}
+                    >
+                      <div className="flex items-stretch">
+                        {/* Drag Handle */}
+                        <div className="bg-gray-100 dark:bg-gray-800 flex items-center justify-center px-3 cursor-move">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                          </svg>
+                        </div>
                             
                             {/* Side Indicator */}
                             {pose.side && (
@@ -1215,8 +1215,8 @@ export default function SequenceEditorPage() {
                                 pose.side === "left" ? "bg-blue-400/20" : "bg-purple-400/20"
                               )}></div>
                             )}
-                            
-                            {/* Pose Info */}
+                        
+                        {/* Pose Info */}
                             <div className={cn(
                               "flex-grow p-4 flex justify-between items-center",
                               pose.side === "left" ? "bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-900/10 dark:to-transparent" : "",
@@ -1237,61 +1237,61 @@ export default function SequenceEditorPage() {
                                     </svg>
                                   </div>
                                 )}
-                                <div>
-                                  <div className="font-medium flex items-center">
-                                    {pose.name}
-                                    {pose.side && (
-                                      <button 
-                                        onClick={() => togglePoseSide(pose.id)}
-                                        className={cn(
-                                          "ml-2 px-2 py-0.5 text-xs rounded-full",
-                                          pose.side === "left" 
-                                            ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100" 
-                                            : "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100"
-                                        )}
-                                      >
-                                        {pose.side === "left" ? "Left" : "Right"}
-                                      </button>
-                                    )}
-                                  </div>
-                                  {pose.sanskrit_name && (
-                                    <div className="text-sm text-gray-500 dark:text-gray-400 italic">
-                                      {pose.sanskrit_name}
-                                    </div>
+                          <div>
+                            <div className="font-medium flex items-center">
+                              {pose.name}
+                              {pose.side && (
+                                <button 
+                                  onClick={() => togglePoseSide(pose.id)}
+                                  className={cn(
+                                    "ml-2 px-2 py-0.5 text-xs rounded-full",
+                                    pose.side === "left" 
+                                      ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100" 
+                                      : "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100"
                                   )}
-                                </div>
-                              </div>
-                              
-                              {/* Duration Selector */}
-                              <div className="flex items-center space-x-3">
-                                <button 
-                                  onClick={() => handleDurationChange(pose.id, Math.max(5, pose.duration_seconds - 5))}
-                                  className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
                                 >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M5 10a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z" clipRule="evenodd" />
-                                  </svg>
+                                  {pose.side === "left" ? "Left" : "Right"}
                                 </button>
-                                
-                                <div className="w-16 text-center font-medium">
-                                  {Math.floor(pose.duration_seconds / 60)}:{(pose.duration_seconds % 60).toString().padStart(2, '0')}
-                                </div>
-                                
-                                <button 
-                                  onClick={() => handleDurationChange(pose.id, pose.duration_seconds + 5)}
-                                  className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
-                                  </svg>
-                                </button>
-                              </div>
+                              )}
                             </div>
+                            {pose.sanskrit_name && (
+                              <div className="text-sm text-gray-500 dark:text-gray-400 italic">
+                                {pose.sanskrit_name}
+                              </div>
+                            )}
+                                </div>
                           </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                  </div>
+                          
+                          {/* Duration Selector */}
+                          <div className="flex items-center space-x-3">
+                            <button 
+                              onClick={() => handleDurationChange(pose.id, Math.max(5, pose.duration_seconds - 5))}
+                              className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M5 10a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z" clipRule="evenodd" />
+                              </svg>
+                            </button>
+                            
+                            <div className="w-16 text-center font-medium">
+                              {Math.floor(pose.duration_seconds / 60)}:{(pose.duration_seconds % 60).toString().padStart(2, '0')}
+                            </div>
+                            
+                            <button 
+                              onClick={() => handleDurationChange(pose.id, pose.duration_seconds + 5)}
+                              className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
                 )}
               </div>
             ))}
@@ -1322,8 +1322,8 @@ export default function SequenceEditorPage() {
           >
             {isRightSidebarOpen ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
           </button>
-        </div>
-        
+                </div>
+                
         <div className="overflow-hidden transition-all duration-300" style={{
           maxWidth: isRightSidebarOpen ? '20rem' : '0',
           opacity: isRightSidebarOpen ? 1 : 0
@@ -1332,8 +1332,8 @@ export default function SequenceEditorPage() {
             <PoseSidebar onPoseSelect={handlePoseSelect} />
           </div>
         </div>
-      </div>
-
+                </div>
+                
       {/* Unsaved Changes Dialog */}
       {isExiting && hasUnsavedChanges && (
         <div 
@@ -1354,7 +1354,7 @@ export default function SequenceEditorPage() {
                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                 </svg>
               </button>
-            </div>
+                  </div>
             <p className="text-gray-600 dark:text-gray-400 mb-4">
               You have unsaved changes. Would you like to save them before leaving?
             </p>
@@ -1375,8 +1375,8 @@ export default function SequenceEditorPage() {
               >
                 Save
               </button>
-            </div>
-          </div>
+                  </div>
+                </div>
         </div>
       )}
       
@@ -1400,7 +1400,7 @@ export default function SequenceEditorPage() {
                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                 </svg>
               </button>
-            </div>
+                </div>
             <p className="text-gray-600 dark:text-gray-400 mb-4">
               You're making changes from an earlier point in history. This will discard {historyStack.length - currentHistoryIndex - 1} future changes. Continue?
             </p>
@@ -1417,10 +1417,10 @@ export default function SequenceEditorPage() {
               >
                 Discard Future
               </button>
-            </div>
-          </div>
+                </div>
+              </div>
         </div>
-      )}
+          )}
     </div>
   )
 } 

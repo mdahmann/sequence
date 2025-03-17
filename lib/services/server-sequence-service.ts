@@ -13,9 +13,31 @@ export const serverSequenceService = {
     const now = new Date().toISOString()
     
     try {
-      // Fetch user ID from session (or use a placeholder ID for non-authenticated users)
+      // Check if the user is authenticated before proceeding
       const { data: { session } } = await supabase.auth.getSession()
-      const userId = session?.user?.id || createId() // Use a generated UUID instead of "anonymous"
+      
+      if (!session?.user?.id) {
+        console.log("User authentication required: No valid session found")
+        throw new Error("UNAUTHENTICATED_USER")
+      }
+      
+      // Use the authenticated user ID
+      const userId = session.user.id
+      console.log(`Authenticated user ID: ${userId}`)
+      
+      // Check if this user exists in the users table
+      const { data: user, error: userError } = await supabase
+        .from("users")
+        .select("id")
+        .eq("id", userId)
+        .single()
+      
+      if (userError || !user) {
+        console.error(`User ID ${userId} not found in users table`, userError)
+        throw new Error("USER_NOT_FOUND")
+      }
+      
+      console.log(`Verified user ${userId} exists in database, proceeding with sequence generation`)
       
       // Call the existing AI sequence generator
       const { sequence: generatedSequence, error } = await generateAISequence({

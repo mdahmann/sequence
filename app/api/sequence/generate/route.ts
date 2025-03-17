@@ -24,25 +24,50 @@ export async function POST(req: NextRequest) {
       )
     }
     
-    // Generate sequence
-    const sequence = await serverSequenceService.generateSequence(validatedParams.data)
-    
-    // Return generated sequence
-    return NextResponse.json({ sequence }, { status: 201 })
-    
-  } catch (error: any) {
-    console.error("Error generating sequence:", error)
-    
-    // Handle different error types
-    if (error.code === "UNAUTHORIZED") {
+    try {
+      // Generate sequence
+      const sequence = await serverSequenceService.generateSequence(validatedParams.data)
+      
+      // Return generated sequence
+      return NextResponse.json({ sequence }, { status: 201 })
+    } catch (error: any) {
+      console.error("Error in sequence generation:", error.message)
+      
+      // Handle specific error types
+      if (error.message === "UNAUTHENTICATED_USER") {
+        return NextResponse.json(
+          { 
+            error: "Authentication required", 
+            message: "Please sign in or create an account to generate sequences." 
+          },
+          { status: 401 }
+        )
+      }
+      
+      if (error.message === "USER_NOT_FOUND") {
+        return NextResponse.json(
+          { 
+            error: "User account issue", 
+            message: "Your user account is not properly set up. Please contact support." 
+          },
+          { status: 403 }
+        )
+      }
+      
+      // Generic error handling
       return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 }
+        { 
+          error: "Sequence generation failed", 
+          message: error.message || "An unexpected error occurred" 
+        },
+        { status: 500 }
       )
     }
     
+  } catch (error: any) {
+    console.error("API Route: Unhandled error:", error)
     return NextResponse.json(
-      { error: "Failed to generate sequence", message: error.message || "Unknown error" },
+      { error: "Failed to process request", message: error.message || "Unknown error" },
       { status: 500 }
     )
   }

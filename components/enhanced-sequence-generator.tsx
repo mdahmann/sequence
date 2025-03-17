@@ -105,12 +105,33 @@ export function EnhancedSequenceGenerator() {
       router.push(`/edit/${sequence.id}`)
       
     } catch (error) {
-      // Error handling is managed by the service
+      // Handle specific error types
+      const apiError = error as APIError;
+      
+      if (apiError.status === 401) {
+        // Authentication required
+        showToast(
+          "Please sign in or create an account to generate sequences",
+          "error"
+        );
+        // Optionally redirect to login page after a short delay
+        setTimeout(() => {
+          router.push("/login");
+        }, 2000);
+      } else if (apiError.status === 403) {
+        // User account issue
+        showToast(
+          "Your user account is not properly set up. Please contact support.",
+          "error"
+        )
+      } else {
+        // Generic error
+        showToast(
+          apiError.message || "Failed to generate sequence", 
+          "error"
+        )
+      }
       console.error("Failed to generate sequence:", error)
-      showToast(
-        (error as APIError).message || "Failed to generate sequence", 
-        "error"
-      )
     } finally {
       setIsGenerating(false)
     }
