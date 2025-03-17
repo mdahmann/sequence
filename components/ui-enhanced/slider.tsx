@@ -29,38 +29,20 @@ export function EnhancedSlider({
 }: EnhancedSliderProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [currentValue, setCurrentValue] = useState(value)
-  const [isEditing, setIsEditing] = useState(false)
-  const [inputValue, setInputValue] = useState("")
   const trackRef = useRef<HTMLDivElement>(null)
   const thumbRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
 
   // Update internal value when prop changes
   useEffect(() => {
     setCurrentValue(value)
   }, [value])
 
-  // Handle clicking outside of input
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (inputRef.current && !inputRef.current.contains(e.target as Node) && isEditing) {
-        confirmInput()
-      }
-    }
-    
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [isEditing, inputValue])
+  // Calculate percentage for positioning - ensure 15 is at 0% and 60 is at 100%
+  const calculatePercentage = (value: number) => {
+    return ((value - 15) / (60 - 15)) * 100
+  }
 
-  // Auto-focus the input when editing starts
-  useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus()
-    }
-  }, [isEditing])
-
-  // Calculate percentage for positioning
-  const percentage = Math.max(0, Math.min(100, ((currentValue - min) / (max - min)) * 100))
+  const percentage = Math.max(0, Math.min(100, calculatePercentage(currentValue)))
 
   // Function to snap value to valid increments (15, 30, 45, 60)
   const snapToValidValue = (value: number): number => {
@@ -70,7 +52,7 @@ export function EnhancedSlider({
     return 60
   }
 
-  // Calculate value from position
+  // Calculate value from position - adjusted for 15-60 range
   const calculateValueFromPosition = (clientX: number) => {
     if (!trackRef.current) return currentValue
     
@@ -78,8 +60,7 @@ export function EnhancedSlider({
     const position = (clientX - trackRect.left) / trackRect.width
     const boundedPosition = Math.max(0, Math.min(1, position))
     
-    let newValue = min + boundedPosition * (max - min)
-    // Snap to valid values (15, 30, 45, 60)
+    let newValue = 15 + boundedPosition * (60 - 15)
     return snapToValidValue(newValue)
   }
 
@@ -102,7 +83,7 @@ export function EnhancedSlider({
       // Calculate value change based on mouse movement
       const deltaX = moveEvent.clientX - startX
       const deltaRatio = deltaX / trackWidth
-      const deltaValue = deltaRatio * (max - min)
+      const deltaValue = deltaRatio * (60 - 15)
       
       // Apply step and constraints
       let newValue = startValue + deltaValue
@@ -144,7 +125,7 @@ export function EnhancedSlider({
       // Calculate value change based on touch movement
       const deltaX = touch.clientX - startX
       const deltaRatio = deltaX / trackWidth
-      const deltaValue = deltaRatio * (max - min)
+      const deltaValue = deltaRatio * (60 - 15)
       
       // Apply step and constraints
       let newValue = startValue + deltaValue
@@ -175,42 +156,6 @@ export function EnhancedSlider({
     onChange(newValue)
   }
   
-  // Handle direct editing
-  const startEditing = () => {
-    setInputValue(currentValue.toString())
-    setIsEditing(true)
-  }
-  
-  const confirmInput = () => {
-    if (inputValue === "") {
-      setIsEditing(false)
-      return
-    }
-    
-    let newValue = parseInt(inputValue, 10)
-    if (isNaN(newValue)) {
-      setIsEditing(false)
-      return
-    }
-    
-    // Ensure the value is within range
-    newValue = Math.max(min, Math.min(max, newValue))
-    // Snap to valid values
-    newValue = snapToValidValue(newValue)
-    
-    setCurrentValue(newValue)
-    onChange(newValue)
-    setIsEditing(false)
-  }
-  
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      confirmInput()
-    } else if (e.key === "Escape") {
-      setIsEditing(false)
-    }
-  }
-  
   // Generate tick marks
   const renderTicks = () => {
     if (!showTicks) return null
@@ -219,37 +164,36 @@ export function EnhancedSlider({
     const validValues = [15, 30, 45, 60]
     
     for (const tickValue of validValues) {
-      if (tickValue >= min && tickValue <= max) {
-        const tickPosition = ((tickValue - min) / (max - min)) * 100
-        
-        ticks.push(
-          <div
-            key={tickValue}
-            className="absolute top-1/2 -translate-y-1/2 w-1 h-3 bg-gray-400 dark:bg-gray-500 rounded-full cursor-pointer"
-            style={{ left: `${tickPosition}%` }}
-            onClick={(e) => {
-              e.stopPropagation()
-              setCurrentValue(tickValue)
-              onChange(tickValue)
-            }}
-          />
-        )
-        
-        // Add tick labels for clearer time delineation
-        ticks.push(
-          <div
-            key={`label-${tickValue}`}
-            className="absolute text-xs text-gray-500 dark:text-gray-400"
-            style={{ 
-              left: `${tickPosition}%`, 
-              top: '12px',
-              transform: 'translateX(-50%)'
-            }}
-          >
-            {tickValue}
-          </div>
-        )
-      }
+      // Calculate position based on 15-60 range
+      const tickPosition = calculatePercentage(tickValue)
+      
+      ticks.push(
+        <div
+          key={tickValue}
+          className="absolute top-1/2 -translate-y-1/2 w-1 h-3 bg-gray-400 dark:bg-gray-500 rounded-full cursor-pointer"
+          style={{ left: `${tickPosition}%` }}
+          onClick={(e) => {
+            e.stopPropagation()
+            setCurrentValue(tickValue)
+            onChange(tickValue)
+          }}
+        />
+      )
+      
+      // Add tick labels for clearer time delineation
+      ticks.push(
+        <div
+          key={`label-${tickValue}`}
+          className="absolute text-xs text-gray-500 dark:text-gray-400"
+          style={{ 
+            left: `${tickPosition}%`, 
+            top: '12px',
+            transform: 'translateX(-50%)'
+          }}
+        >
+          {tickValue}
+        </div>
+      )
     }
     
     return ticks
@@ -257,8 +201,13 @@ export function EnhancedSlider({
 
   return (
     <div className={`relative ${className}`}>
-      {/* Value display only */}
-      <div className="flex items-center justify-end mb-2">
+      {/* Title */}
+      <div className="font-medium text-gray-700 dark:text-gray-300 mb-4">
+        Duration (minutes)
+      </div>
+      
+      {/* Value display - positioned at the top right */}
+      <div className="absolute top-0 right-0">
         <div className="font-semibold text-vibrant-blue text-sm px-2 py-0.5 bg-vibrant-blue/10 rounded-md">
           {currentValue} mins
         </div>
@@ -267,7 +216,7 @@ export function EnhancedSlider({
       {/* Slider track */}
       <div 
         ref={trackRef}
-        className="relative h-2 rounded-full bg-gray-200 dark:bg-gray-700 cursor-pointer w-full"
+        className="relative h-2 rounded-full bg-gray-200 dark:bg-gray-700 cursor-pointer w-full mt-6"
         onClick={handleTrackClick}
       >
         {/* Filled track */}
@@ -290,12 +239,6 @@ export function EnhancedSlider({
           onMouseDown={handleThumbMouseDown}
           onTouchStart={handleThumbTouchStart}
         />
-      </div>
-
-      {/* Min/Max edge indicators */}
-      <div className="flex justify-between mt-5 text-xs text-gray-500 dark:text-gray-400">
-        <div>15 mins</div>
-        <div>60 mins</div>
       </div>
     </div>
   )
