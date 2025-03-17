@@ -12,31 +12,63 @@ interface EnhancedSliderProps {
   tickInterval?: number
   formatValue?: (value: number) => string
   className?: string
+  title?: string
 }
 
 export function EnhancedSlider({
   min,
   max,
-  step = 1,
+  step = 15,
   value,
   onChange,
-  showTicks = false,
+  showTicks = true,
   tickInterval = 15,
-  formatValue = (value) => value.toString(),
+  formatValue = (value) => `${value} mins`,
   className = "",
+  title,
 }: EnhancedSliderProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [currentValue, setCurrentValue] = useState(value)
+  const [isEditing, setIsEditing] = useState(false)
+  const [inputValue, setInputValue] = useState("")
   const trackRef = useRef<HTMLDivElement>(null)
   const thumbRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   // Update internal value when prop changes
   useEffect(() => {
     setCurrentValue(value)
   }, [value])
 
+  // Handle clicking outside of input
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (inputRef.current && !inputRef.current.contains(e.target as Node) && isEditing) {
+        confirmInput()
+      }
+    }
+    
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [isEditing, inputValue])
+
+  // Auto-focus the input when editing starts
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus()
+    }
+  }, [isEditing])
+
   // Calculate percentage for positioning
   const percentage = Math.max(0, Math.min(100, ((currentValue - min) / (max - min)) * 100))
+
+  // Function to snap value to valid increments (15, 30, 45, 60)
+  const snapToValidValue = (value: number): number => {
+    if (value <= 15) return 15
+    if (value <= 30) return 30
+    if (value <= 45) return 45
+    return 60
+  }
 
   // Calculate value from position
   const calculateValueFromPosition = (clientX: number) => {
@@ -47,8 +79,8 @@ export function EnhancedSlider({
     const boundedPosition = Math.max(0, Math.min(1, position))
     
     let newValue = min + boundedPosition * (max - min)
-    newValue = Math.round(newValue / step) * step
-    return Math.max(min, Math.min(max, newValue))
+    // Snap to valid values (15, 30, 45, 60)
+    return snapToValidValue(newValue)
   }
 
   // Handle mouse down on thumb
@@ -74,8 +106,7 @@ export function EnhancedSlider({
       
       // Apply step and constraints
       let newValue = startValue + deltaValue
-      newValue = Math.round(newValue / step) * step
-      newValue = Math.max(min, Math.min(max, newValue))
+      newValue = snapToValidValue(newValue)
       
       setCurrentValue(newValue)
       onChange(newValue)
@@ -117,8 +148,7 @@ export function EnhancedSlider({
       
       // Apply step and constraints
       let newValue = startValue + deltaValue
-      newValue = Math.round(newValue / step) * step
-      newValue = Math.max(min, Math.min(max, newValue))
+      newValue = snapToValidValue(newValue)
       
       setCurrentValue(newValue)
       onChange(newValue)
@@ -145,17 +175,51 @@ export function EnhancedSlider({
     onChange(newValue)
   }
   
+  // Handle direct editing
+  const startEditing = () => {
+    setInputValue(currentValue.toString())
+    setIsEditing(true)
+  }
+  
+  const confirmInput = () => {
+    if (inputValue === "") {
+      setIsEditing(false)
+      return
+    }
+    
+    let newValue = parseInt(inputValue, 10)
+    if (isNaN(newValue)) {
+      setIsEditing(false)
+      return
+    }
+    
+    // Ensure the value is within range
+    newValue = Math.max(min, Math.min(max, newValue))
+    // Snap to valid values
+    newValue = snapToValidValue(newValue)
+    
+    setCurrentValue(newValue)
+    onChange(newValue)
+    setIsEditing(false)
+  }
+  
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      confirmInput()
+    } else if (e.key === "Escape") {
+      setIsEditing(false)
+    }
+  }
+  
   // Generate tick marks
   const renderTicks = () => {
     if (!showTicks) return null
     
     const ticks = []
-    // Force 15-minute increments
-    const numTicks = Math.floor((max - min) / 15) + 1
+    const validValues = [15, 30, 45, 60]
     
-    for (let i = 0; i < numTicks; i++) {
-      const tickValue = min + i * 15
-      if (tickValue <= max) {
+    for (const tickValue of validValues) {
+      if (tickValue >= min && tickValue <= max) {
         const tickPosition = ((tickValue - min) / (max - min)) * 100
         
         ticks.push(
@@ -182,7 +246,7 @@ export function EnhancedSlider({
               transform: 'translateX(-50%)'
             }}
           >
-            {formatValue(tickValue)}
+            {tickValue}
           </div>
         )
       }
@@ -192,18 +256,38 @@ export function EnhancedSlider({
   }
 
   return (
-    <div className={`relative py-4 ${className}`}>
-      {/* Selected value display - positioned at top */}
-      <div className="mb-1 text-center">
-        <div className="font-semibold text-vibrant-blue inline-block px-4 py-1 bg-vibrant-blue/10 rounded-full">
-          {formatValue(currentValue)}
+    <div className={`relative ${className}`}>
+      {/* Title and value */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="font-medium text-gray-700 dark:text-gray-300">
+          {title || "Duration (mins)"}
         </div>
+        {isEditing ? (
+          <input
+            ref={inputRef}
+            type="number"
+            min={min}
+            max={max}
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={confirmInput}
+            className="w-12 px-1 py-0.5 text-center text-sm font-medium bg-vibrant-blue/10 rounded border border-vibrant-blue"
+          />
+        ) : (
+          <div 
+            onClick={startEditing}
+            className="cursor-pointer font-semibold text-vibrant-blue text-sm px-2 py-0.5 bg-vibrant-blue/10 rounded-md hover:bg-vibrant-blue/20 transition-colors"
+          >
+            {currentValue}
+          </div>
+        )}
       </div>
       
       {/* Slider track */}
       <div 
         ref={trackRef}
-        className="relative h-2 rounded-full bg-gray-200 dark:bg-gray-700 cursor-pointer mt-3"
+        className="relative h-2 rounded-full bg-gray-200 dark:bg-gray-700 cursor-pointer"
         onClick={handleTrackClick}
       >
         {/* Filled track */}
@@ -227,8 +311,6 @@ export function EnhancedSlider({
           onTouchStart={handleThumbTouchStart}
         />
       </div>
-      
-      {/* Min/Max labels removed */}
     </div>
   )
 } 
