@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search } from "lucide-react"
+import { Search, ChevronDown, ChevronUp } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useSupabase } from "@/components/providers"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -34,6 +34,7 @@ export function PoseSidebar({ onPoseSelect }: PoseSidebarProps) {
   const [selectedDifficulties, setSelectedDifficulties] = useState<string[]>([])
   const [activeTab, setActiveTab] = useState<string>("all")
   const [draggedPose, setDraggedPose] = useState<Pose | null>(null)
+  const [difficultyExpanded, setDifficultyExpanded] = useState(false)
 
   useEffect(() => {
     const fetchPoses = async () => {
@@ -275,36 +276,32 @@ export function PoseSidebar({ onPoseSelect }: PoseSidebarProps) {
       </Tabs>
 
       <div className="space-y-3 mb-4">
-        <div>
-          <h3 className="text-sm font-medium mb-2">Difficulty</h3>
-          <div className="flex flex-wrap gap-2">
-            {difficulties.map((difficulty) => (
-              <Badge
-                key={difficulty}
-                variant={selectedDifficulties.includes(difficulty) ? "default" : "outline"}
-                className="cursor-pointer capitalize"
-                onClick={() => handleDifficultyToggle(difficulty)}
-              >
-                {formatCategory(difficulty)}
-              </Badge>
-            ))}
-          </div>
-        </div>
-        
-        <div>
-          <h3 className="text-sm font-medium mb-2">Categories</h3>
-          <div className="flex flex-wrap gap-2">
-            {categories.map((category) => (
-              <Badge
-                key={category}
-                variant={selectedCategories.includes(category) ? "default" : "outline"}
-                className="cursor-pointer capitalize"
-                onClick={() => handleCategoryToggle(category)}
-              >
-                {formatCategory(category)}
-              </Badge>
-            ))}
-          </div>
+        {/* Collapsible difficulty filter */}
+        <div className="border rounded-md overflow-hidden">
+          <button 
+            className="w-full px-3 py-2 flex justify-between items-center text-sm font-medium hover:bg-accent/50"
+            onClick={() => setDifficultyExpanded(!difficultyExpanded)}
+          >
+            <span>Filter by Difficulty</span>
+            {difficultyExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </button>
+          
+          {difficultyExpanded && (
+            <div className="p-3 pt-0">
+              <div className="flex flex-wrap gap-2 pt-3 border-t">
+                {difficulties.map((difficulty) => (
+                  <Badge
+                    key={difficulty}
+                    variant={selectedDifficulties.includes(difficulty) ? "default" : "outline"}
+                    className="cursor-pointer capitalize"
+                    onClick={() => handleDifficultyToggle(difficulty)}
+                  >
+                    {formatCategory(difficulty)}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
