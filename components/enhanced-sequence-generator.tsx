@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { EnhancedSlider } from "./ui-enhanced/slider"
@@ -10,23 +10,6 @@ import { clientSequenceService, APIError } from "@/lib/services/client-sequence-
 import { Sequence, SequenceParams } from "@/types/sequence"
 import { cn } from "@/lib/utils"
 import { useSupabase } from "@/components/providers"
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import { Button } from "@/components/ui/button"
-import { Loader2 } from "lucide-react"
-import { useToast as useToastHook } from "@/components/ui/use-toast"
-import { Slider } from "@/components/ui/slider"
-import { Textarea } from "@/components/ui/textarea"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { useForm } from "react-hook-form"
-import { z } from "zod"
 
 // Define options for each form field
 const difficultyOptions = [
@@ -52,28 +35,8 @@ const focusOptions = [
   { value: "flexibility", label: "Flexibility" },
 ]
 
-// Define the form schema
-const formSchema = z.object({
-  duration: z.string().min(1, "Duration is required"),
-  difficulty: z.string().min(1, "Difficulty is required"),
-  style: z.string().min(1, "Style is required"),
-  focus: z.string().min(1, "Focus is required"),
-  additionalNotes: z.string().optional(),
-})
-
-// Define the form values type
-type FormValues = z.infer<typeof formSchema>
-
-export default function EnhancedSequenceGenerator({
-  onSequenceGenerated,
-}: {
-  onSequenceGenerated: (sequence: Sequence) => void;
-}) {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const { isAuthenticated } = useSupabase();
-  const { toast } = useToastHook();
-  const router = useRouter();
+export function EnhancedSequenceGenerator() {
+  const router = useRouter()
   
   // Form state
   const [duration, setDuration] = useState(30)
@@ -83,19 +46,33 @@ export default function EnhancedSequenceGenerator({
   const [additionalNotes, setAdditionalNotes] = useState("")
   
   // UI state
+  const [isGenerating, setIsGenerating] = useState(false)
   const [generatedSequence, setGeneratedSequence] = useState<Sequence | null>(null)
   
-  // Create form
-  const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      duration: "30",
-      difficulty: "intermediate",
-      style: "vinyasa",
-      focus: "full body",
-      additionalNotes: "",
-    },
-  })
+  // Use toast notification system
+  const { showToast } = useToast()
+  
+  // Use Supabase
+  const { supabase, isAuthenticated } = useSupabase()
+  
+  // Log authentication status when component mounts
+  useEffect(() => {
+    async function checkAuthStatus() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        console.log("Client Auth Status:", { 
+          isAuthenticated, 
+          userId: session?.user?.id || 'none',
+          email: session?.user?.email || 'none',
+          provider: session?.user?.app_metadata?.provider || 'none'
+        })
+      } catch (error) {
+        console.error("Error checking auth status:", error)
+      }
+    }
+    
+    checkAuthStatus()
+  }, [supabase, isAuthenticated])
   
   // Handler to navigate to sequence editor
   const handleEditSequence = () => {
@@ -126,224 +103,247 @@ export default function EnhancedSequenceGenerator({
     }
   }
   
-  async function handleGenerateSequence(values: FormValues) {
-    setIsLoading(true);
-    setError(null);
+  // Generate sequence based on form inputs
+  const handleGenerateSequence = async () => {
+    setIsGenerating(true)
+    setGeneratedSequence(null)
     
     try {
-      // Check if user is authenticated
+      // Get and log the current session information
+      const { data: { session } } = await supabase.auth.getSession()
+      console.log("Generate sequence - Auth details:", {
+        isAuthenticated,
+        sessionExists: !!session,
+        userId: session?.user?.id || 'none',
+        email: session?.user?.email || 'none'
+      })
+      
+      // First check if user is already logged in using the useSupabase hook
+      // This is a client-side check before making the API call
       if (!isAuthenticated) {
-        toast({
-          variant: "destructive",
-          title: "Authentication required",
-          description: "Please sign in or sign up to generate sequences.",
-        });
+        console.log("Client-side auth check: User not authenticated");
+        showToast(
+          "Please sign in or create an account to generate sequences",
+          "auth",
+          12000, // Show for longer (12 seconds)
+          "center", // Display in center of screen
+          [
+            {
+              label: "Sign In",
+              onClick: () => router.push("/login")
+            },
+            {
+              label: "Sign Up",
+              onClick: () => router.push("/signup")
+            }
+          ]
+        );
+        setIsGenerating(false);
         return;
       }
       
-      const response = await fetch("/api/sequence/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          duration: Number(values.duration),
-          difficulty: values.difficulty,
-          style: values.style,
-          focus: values.focus,
-          additionalNotes: values.additionalNotes
-        }),
-      });
+      console.log("Client-side auth check: User is authenticated");
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to generate sequence");
+      const params: SequenceParams = {
+        duration,
+        difficulty: difficulty as "beginner" | "intermediate" | "advanced",
+        style: style as "vinyasa" | "hatha" | "yin" | "power" | "restorative",
+        focus: focus as "full body" | "upper body" | "lower body" | "core" | "balance" | "flexibility",
+        additionalNotes: additionalNotes || undefined,
       }
       
-      const generatedSequence = await response.json();
-      onSequenceGenerated(generatedSequence);
+      console.log("Generating sequence with params:", params);
+      const sequence = await clientSequenceService.generateSequence(params)
       
-      toast({
-        title: "Sequence generated",
-        description: "Your yoga sequence has been created successfully.",
-      });
+      // Save the sequence to localStorage for the beta version
+      saveSequenceToLocalStorage(sequence)
       
-    } catch (error: any) {
-      console.error("Error generating sequence:", error);
-      setError(error.message || "An unexpected error occurred");
+      showToast("Sequence generated successfully!", "success")
       
-      toast({
-        variant: "destructive",
-        title: "Generation failed",
-        description: error.message || "Failed to generate sequence. Please try again.",
-      });
+      // Automatically redirect to the editor page
+      router.push(`/edit/${sequence.id}`)
+      
+    } catch (error) {
+      console.error("Sequence generation error:", error);
+      
+      // Handle specific error types
+      const apiError = error as APIError;
+      
+      // Authentication errors (401)
+      if (apiError.status === 401) {
+        console.log("Authentication error detected");
+        showToast(
+          "Please sign in or create an account to generate sequences",
+          "auth",
+          12000, // Show for longer (12 seconds)
+          "center", // Display in center of screen
+          [
+            {
+              label: "Sign In",
+              onClick: () => router.push("/login")
+            },
+            {
+              label: "Sign Up",
+              onClick: () => router.push("/signup")
+            }
+          ]
+        );
+        return;
+      } 
+      
+      // User account issues (403)
+      if (apiError.status === 403) {
+        console.log("User account issue detected");
+        showToast(
+          "Your user account is not properly set up. Please contact support.",
+          "error"
+        );
+        return;
+      } 
+      
+      // Handle all other errors
+      const errorMessage = apiError.message || "Failed to generate sequence";
+      console.log("Showing generic error toast:", errorMessage);
+      showToast(errorMessage, "error");
+      
     } finally {
-      setIsLoading(false);
+      setIsGenerating(false)
     }
   }
   
   return (
-    <div className="sequence-generator">
-      <Card>
-        <CardHeader>
-          <CardTitle>Generate Yoga Sequence</CardTitle>
-          <CardDescription>
-            Create a personalized yoga sequence based on your preferences
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleGenerateSequence)} className="space-y-6">
-              {/* Duration field */}
-              <FormField
-                control={form.control}
-                name="duration"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Duration (minutes)</FormLabel>
-                    <FormControl>
-                      <div className="space-y-2">
-                        <Slider 
-                          min={15} 
-                          max={90} 
-                          step={5} 
-                          defaultValue={[Number(field.value)]}
-                          onValueChange={(value) => field.onChange(value[0].toString())}
-                        />
-                        <div className="text-center font-medium">{field.value} minutes</div>
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              {/* Difficulty field */}
-              <FormField
-                control={form.control}
-                name="difficulty"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Difficulty Level</FormLabel>
-                    <Select 
-                      value={field.value} 
-                      onValueChange={field.onChange}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select difficulty" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {difficultyOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              {/* Style field */}
-              <FormField
-                control={form.control}
-                name="style"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Yoga Style</FormLabel>
-                    <Select 
-                      value={field.value} 
-                      onValueChange={field.onChange}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select style" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {styleOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              {/* Focus field */}
-              <FormField
-                control={form.control}
-                name="focus"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Focus Area</FormLabel>
-                    <Select 
-                      value={field.value} 
-                      onValueChange={field.onChange}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select focus area" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {focusOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              {/* Additional notes field */}
-              <FormField
-                control={form.control}
-                name="additionalNotes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Additional Notes (Optional)</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Add any specific requests or notes for your sequence..."
-                        className="resize-none"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              {error && (
-                <div className="bg-destructive/15 p-3 rounded-md text-destructive text-sm">
-                  {error}
+    <div className="bg-warm-white dark:bg-deep-charcoal-light rounded-lg shadow-sm overflow-hidden">
+      <div className="p-6">
+        <div className="space-y-6">
+          {/* Duration slider */}
+          <div>
+            <label className="block text-sm font-medium mb-2 text-deep-charcoal dark:text-warm-white">
+              Duration (minutes)
+            </label>
+            <EnhancedSlider
+              min={5}
+              max={90}
+              step={5}
+              value={duration}
+              onChange={setDuration}
+              showTicks
+              tickInterval={15}
+              formatValue={(value) => `${value} min`}
+            />
+          </div>
+          
+          {/* Difficulty selection */}
+          <div>
+            <label className="block text-sm font-medium mb-2 text-deep-charcoal dark:text-warm-white">
+              Difficulty Level
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {difficultyOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setDifficulty(option.value)}
+                  className={cn(
+                    "relative border rounded-lg p-4 cursor-pointer transition-all duration-200",
+                    difficulty === option.value
+                      ? "border-vibrant-blue bg-vibrant-blue/5"
+                      : "border-gray-200 dark:border-gray-700 hover:border-vibrant-blue/50"
+                  )}
+                >
+                  <div className="font-medium">{option.label}</div>
+                  {option.description && (
+                    <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                      {option.description}
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          {/* Style selection */}
+          <div>
+            <label className="block text-sm font-medium mb-2 text-deep-charcoal dark:text-warm-white">
+              Yoga Style
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {styleOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setStyle(option.value)}
+                  className={cn(
+                    "px-4 py-2 rounded-full border-2 transition-colors",
+                    style === option.value
+                      ? "border-vibrant-blue bg-vibrant-blue/10 text-vibrant-blue"
+                      : "border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  )}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          {/* Focus selection */}
+          <div>
+            <label className="block text-sm font-medium mb-2 text-deep-charcoal dark:text-warm-white">
+              Area of Focus
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {focusOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setFocus(option.value)}
+                  className={cn(
+                    "px-4 py-2 rounded-full border-2 transition-colors",
+                    focus === option.value
+                      ? "border-vibrant-blue bg-vibrant-blue/10 text-vibrant-blue"
+                      : "border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  )}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          {/* Additional notes */}
+          <div>
+            <label className="block text-sm font-medium mb-2 text-deep-charcoal dark:text-warm-white">
+              Additional Requirements (Optional)
+            </label>
+            <textarea
+              value={additionalNotes}
+              onChange={(e) => setAdditionalNotes(e.target.value)}
+              placeholder="Any specific requirements or preferences..."
+              className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-vibrant-blue/50 dark:bg-gray-800 dark:text-gray-100"
+              rows={3}
+            />
+          </div>
+          
+          {/* Generate button */}
+          <div>
+            <motion.button
+              onClick={handleGenerateSequence}
+              disabled={isGenerating}
+              className="w-full py-3 px-4 bg-vibrant-blue hover:bg-vibrant-blue/90 text-white font-medium rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-vibrant-blue/50 focus:ring-offset-2 disabled:opacity-70 transition-colors"
+              whileTap={{ scale: 0.98 }}
+              whileHover={{ scale: 1.02 }}
+            >
+              {isGenerating ? (
+                <div className="flex items-center justify-center">
+                  <LoadingSpinner size="small" color="white" className="mr-2" />
+                  <span>Generating...</span>
                 </div>
+              ) : (
+                "Generate Sequence"
               )}
-              
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  "Generate Sequence"
-                )}
-              </Button>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+            </motion.button>
+          </div>
+        </div>
+      </div>
       
       {/* Results preview */}
       {generatedSequence && (

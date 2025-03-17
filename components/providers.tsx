@@ -43,6 +43,18 @@ export function Providers({ children }: { children: React.ReactNode }) {
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           (_event, session) => {
             console.log("Auth state changed:", _event, session ? "Authenticated" : "Not authenticated")
+            
+            // Log detailed user information
+            if (session?.user) {
+              console.log("Auth user details:", {
+                userId: session.user.id,
+                email: session.user.email,
+                provider: session.user.app_metadata?.provider || 'unknown',
+                createdAt: session.user.created_at,
+                lastSignInAt: session.user.last_sign_in_at
+              })
+            }
+            
             setIsAuthenticated(!!session)
             
             // Refresh the page after auth state changes to ensure all components update

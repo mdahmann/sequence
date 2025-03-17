@@ -1,66 +1,67 @@
-import { Suspense } from "react"
-import { Metadata } from "next"
+import { createServerSupabaseClient } from "@/lib/supabase"
 import { notFound } from "next/navigation"
-import { SequenceEditor } from "./components/sequence-editor"
-import EnhancedSequenceGenerator from "@/components/enhanced-sequence-generator"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ClientFlowPage } from "./components/client-flow-page"
 
-export const metadata: Metadata = {
-  title: "Flow Editor | Sequence",
-  description: "Create and edit yoga flows",
+interface PageParams {
+  params: {
+    id: string
+  }
 }
 
-export default function FlowEditorPage({ params }: { params: { id: string } }) {
-  const id = params.id
-  
-  // If the ID is 'new', show the sequence generator
-  if (id === 'new') {
+export default async function FlowPage({ params }: PageParams) {
+  try {
+    // Properly destructure the ID to avoid the Next.js warning
+    const { id } = params
+    const supabase = createServerSupabaseClient()
+
+    // Get the current user
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    // Fetch the sequence with its poses - don't filter by user_id to allow viewing shared sequences
+    const { data: sequence, error } = await supabase
+      .from("sequences")
+      .select(`
+        *,
+        sequence_poses (
+          id,
+          position,
+          duration,
+          side,
+          cues,
+          poses (*)
+        )
+      `)
+      .eq("id", id)
+      .single()
+
+    if (error || !sequence) {
+      console.error("Error fetching sequence:", error)
+      return notFound()
+    }
+
+    // Check if the user owns this sequence or if it's a shared sequence
+    const initialIsOwner = session?.user?.id === sequence.user_id
+    console.log("Server Flow owner check:", { 
+      userLoggedIn: !!session?.user,
+      userEmail: session?.user?.email,
+      userIdInSession: session?.user?.id,
+      sequenceUserId: sequence.user_id,
+      isOwner: initialIsOwner
+    })
+    
+    // Sort the poses by position
+    sequence.sequence_poses.sort((a: any, b: any) => a.position - b.position)
+
     return (
-      <div className="container mx-auto py-6 max-w-5xl">
-        <h1 className="text-3xl font-bold mb-6">Create New Flow</h1>
-        
-        <Tabs defaultValue="generator" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-8">
-            <TabsTrigger value="generator">Generate with AI</TabsTrigger>
-            <TabsTrigger value="blank">Start from Blank</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="generator">
-            <EnhancedSequenceGenerator 
-              onSequenceGenerated={(sequence) => {
-                // Redirect to the editor for the newly created sequence
-                window.location.href = `/flows/${sequence.id}`
-              }}
-            />
-          </TabsContent>
-          
-          <TabsContent value="blank">
-            <div className="bg-muted p-8 rounded-lg text-center">
-              <h3 className="text-xl font-medium mb-4">Start with an Empty Flow</h3>
-              <p className="mb-6 text-muted-foreground">
-                Create a flow from scratch and add poses manually
-              </p>
-              <button 
-                className="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md"
-                onClick={() => {
-                  // Create an empty sequence and redirect
-                  window.location.href = `/flows/empty`
-                }}
-              >
-                Create Empty Flow
-              </button>
-            </div>
-          </TabsContent>
-        </Tabs>
+      <div className="container py-6 md:py-10">
+        <ClientFlowPage sequence={sequence} initialIsOwner={initialIsOwner} />
       </div>
     )
+  } catch (error) {
+    console.error("Error in flow page:", error)
+    return notFound()
   }
-  
-  // Otherwise, load the sequence editor
-  return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <SequenceEditor id={id} />
-    </Suspense>
-  )
 }
 
