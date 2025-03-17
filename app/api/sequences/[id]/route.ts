@@ -6,11 +6,21 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    // Ensure params is properly resolved before using
+    const id = params?.id
+    
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Sequence ID is required' },
+        { status: 400 }
+      )
+    }
+    
     const supabase = createServerSupabaseClient()
     const { data, error } = await supabase
       .from('sequences')
       .select('*')
-      .eq('id', params.id)
+      .eq('id', id)
       .single()
 
     if (error || !data) {
