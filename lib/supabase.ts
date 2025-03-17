@@ -1,33 +1,19 @@
 import { createClient } from "@supabase/supabase-js"
-import { cookies } from "next/headers"
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createServerClient } from "@supabase/ssr"
 import type { Database } from "@/types/supabase"
 
-// Create a Supabase client for server-side use
-export async function createServerSupabaseClient() {
-  try {
-    // Get the cookie store first to avoid the async warning
-    const cookieStore = cookies()
-    
-    // Create server component client with cookie handling
-    return createServerComponentClient<Database>({
-      cookies: () => cookieStore
-    })
-  } catch (error) {
-    console.error("Failed to create server component client:", error)
-    
-    // Fallback to direct client
-    return createClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-        }
+// Create a Supabase client for server-side use - direct client without cookies
+export function createServerSupabaseClient() {
+  return createClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
       }
-    )
-  }
+    }
+  )
 }
 
 // Client components should use the useSupabase hook from the providers context
