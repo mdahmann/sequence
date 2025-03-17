@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { serverSequenceService } from "@/lib/services/server-sequence-service"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
+import { cookies } from "next/headers"
+import type { Database } from "@/types/supabase"
 import { SequenceStructure, SequenceSegment } from "@/types/sequence"
 
 // Schema for fill-poses request
@@ -33,8 +35,11 @@ const fillPosesRequestSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    // Create supabase server client
-    const supabase = createServerSupabaseClient()
+    // Create supabase server client with proper cookie handling
+    const cookieStore = cookies()
+    const supabase = createServerComponentClient<Database>({
+      cookies: () => cookieStore
+    })
     
     // Get the session
     const { data: { session } } = await supabase.auth.getSession()
