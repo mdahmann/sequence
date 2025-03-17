@@ -169,6 +169,21 @@ export function EnhancedSlider({
             }}
           />
         )
+        
+        // Add tick labels for clearer time delineation
+        ticks.push(
+          <div
+            key={`label-${tickValue}`}
+            className="absolute text-xs text-gray-500 dark:text-gray-400"
+            style={{ 
+              left: `${tickPosition}%`, 
+              top: '12px',
+              transform: 'translateX(-50%)'
+            }}
+          >
+            {formatValue(tickValue)}
+          </div>
+        )
       }
     }
     
@@ -176,11 +191,18 @@ export function EnhancedSlider({
   }
 
   return (
-    <div className={`relative py-4 ${className}`}>
+    <div className={`relative py-8 ${className}`}>
+      {/* Selected value display - positioned at top */}
+      <div className="mb-2 text-center">
+        <div className="font-semibold text-vibrant-blue inline-block px-4 py-1 bg-vibrant-blue/10 rounded-full">
+          {formatValue(currentValue)}
+        </div>
+      </div>
+      
       {/* Slider track */}
       <div 
         ref={trackRef}
-        className="relative h-2 rounded-full bg-gray-200 dark:bg-gray-700 cursor-pointer"
+        className="relative h-2 rounded-full bg-gray-200 dark:bg-gray-700 cursor-pointer mt-6"
         onClick={handleTrackClick}
       >
         {/* Filled track */}
@@ -205,12 +227,9 @@ export function EnhancedSlider({
         />
       </div>
       
-      {/* Value display */}
-      <div className="mt-2 flex justify-between text-sm text-gray-600 dark:text-gray-400">
+      {/* Min/Max labels */}
+      <div className="mt-6 flex justify-between text-sm text-gray-600 dark:text-gray-400">
         <div>{formatValue(min)}</div>
-        <div className="font-semibold text-vibrant-blue">
-          {formatValue(currentValue)}
-        </div>
         <div>{formatValue(max)}</div>
       </div>
     </div>
