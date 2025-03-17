@@ -1152,7 +1152,7 @@ export default function SequenceEditorPage() {
                     title="Save Settings"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      <path d="M17 2.5H3C2.4 2.5 2 2.9 2 3.5v13c0 .6.4 1 1 1h14c.6 0 1-.4 1-1v-13c0-.6-.4-1-1-1zM10 15.5c-1.7 0-3-1.3-3-3s1.3-3 3-3 3 1.3 3 3-1.3 3-3 3zm4-10H5c-.6 0-1-.4-1-1v-1h11v1c0 .6-.4 1-1 1z" />
                     </svg>
                   </button>
                 </>
@@ -1174,7 +1174,7 @@ export default function SequenceEditorPage() {
                     title="Save"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h1a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h2v5.586l-1.293-1.293zM9 4a1 1 0 012 0v2H9V4z" />
+                      <path d="M17 2.5H3C2.4 2.5 2 2.9 2 3.5v13c0 .6.4 1 1 1h14c.6 0 1-.4 1-1v-13c0-.6-.4-1-1-1zM10 15.5c-1.7 0-3-1.3-3-3s1.3-3 3-3 3 1.3 3 3-1.3 3-3 3zm4-10H5c-.6 0-1-.4-1-1v-1h11v1c0 .6-.4 1-1 1z" />
                     </svg>
                   </button>
                 </>
