@@ -59,7 +59,18 @@ export function EnhancedSequenceGenerator() {
       
       // Store the session token in localStorage for API requests
       if (session?.access_token) {
-        localStorage.setItem("supabase.auth.token", session.access_token)
+        console.log("Storing auth token in localStorage, token length:", session.access_token.length);
+        localStorage.setItem("supabase.auth.token", session.access_token);
+      } else {
+        console.log("No access token found in session");
+        // Try to refresh the session if we're authenticated but no token
+        if (isAuthenticated) {
+          const { data } = await supabase.auth.refreshSession();
+          if (data.session?.access_token) {
+            console.log("Got refreshed token, storing in localStorage");
+            localStorage.setItem("supabase.auth.token", data.session.access_token);
+          }
+        }
       }
     }
     
