@@ -378,7 +378,7 @@ export function PoseSidebar({ onPoseSelect }: PoseSidebarProps) {
               <div
                 key={pose.id}
                 className={cn(
-                  "rounded-md p-3 cursor-grab hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors",
+                  "bg-white dark:bg-deep-charcoal-light rounded-md p-3 cursor-grab hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors",
                   draggedPose?.id === pose.id && "opacity-50 bg-gray-100 dark:bg-gray-800"
                 )}
                 draggable

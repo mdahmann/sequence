@@ -1358,7 +1358,7 @@ export default function SequenceEditorPage() {
                               delay: index * 0.05 
                             }}
                             className={cn(
-                              "bg-warm-white dark:bg-deep-charcoal-light rounded-lg shadow-sm overflow-hidden w-full",
+                              "bg-white dark:bg-deep-charcoal-light rounded-lg shadow-sm overflow-hidden w-full",
                               isDragging && draggedPose?.id === pose.id ? "border-2 border-vibrant-blue" : "",
                               pose.side === "left" ? "border-l-4 border-l-blue-400" : "",
                               pose.side === "right" ? "border-r-4 border-r-purple-400" : ""
