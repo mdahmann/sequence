@@ -21,7 +21,7 @@ export function EnhancedSlider({
   value,
   onChange,
   showTicks = false,
-  tickInterval = 10,
+  tickInterval = 15,
   formatValue = (value) => value.toString(),
   className = "",
 }: EnhancedSliderProps) {
@@ -150,10 +150,11 @@ export function EnhancedSlider({
     if (!showTicks) return null
     
     const ticks = []
-    const numTicks = Math.floor((max - min) / tickInterval) + 1
+    // Force 15-minute increments
+    const numTicks = Math.floor((max - min) / 15) + 1
     
     for (let i = 0; i < numTicks; i++) {
-      const tickValue = min + i * tickInterval
+      const tickValue = min + i * 15
       if (tickValue <= max) {
         const tickPosition = ((tickValue - min) / (max - min)) * 100
         
@@ -191,9 +192,9 @@ export function EnhancedSlider({
   }
 
   return (
-    <div className={`relative py-8 ${className}`}>
+    <div className={`relative py-4 ${className}`}>
       {/* Selected value display - positioned at top */}
-      <div className="mb-2 text-center">
+      <div className="mb-1 text-center">
         <div className="font-semibold text-vibrant-blue inline-block px-4 py-1 bg-vibrant-blue/10 rounded-full">
           {formatValue(currentValue)}
         </div>
@@ -202,7 +203,7 @@ export function EnhancedSlider({
       {/* Slider track */}
       <div 
         ref={trackRef}
-        className="relative h-2 rounded-full bg-gray-200 dark:bg-gray-700 cursor-pointer mt-6"
+        className="relative h-2 rounded-full bg-gray-200 dark:bg-gray-700 cursor-pointer mt-3"
         onClick={handleTrackClick}
       >
         {/* Filled track */}
@@ -227,11 +228,7 @@ export function EnhancedSlider({
         />
       </div>
       
-      {/* Min/Max labels */}
-      <div className="mt-6 flex justify-between text-sm text-gray-600 dark:text-gray-400">
-        <div>{formatValue(min)}</div>
-        <div>{formatValue(max)}</div>
-      </div>
+      {/* Min/Max labels removed */}
     </div>
   )
 } 
