@@ -12,6 +12,11 @@ import {
 } from '@/types/sequence'
 import { getYogaGuidelines } from '@/lib/server-utils'
 
+// Add type declaration for global cache
+declare global {
+  var __sequence_cache: Record<string, Sequence>;
+}
+
 // Create an OpenAI instance if the API key is available
 const openai = process.env.OPENAI_API_KEY 
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -291,6 +296,16 @@ export const serverSequenceService = {
       throw new Error("OpenAI client not initialized");
     }
     
+    // Cache key for this sequence to prevent duplicate API calls
+    const cacheKey = `sequence_poses_${structure.name}_${params.style}_${params.focus}`;
+    
+    // Check if we have a cached response
+    const cachedResult = global.__sequence_cache?.[cacheKey];
+    if (cachedResult) {
+      console.log("serverSequenceService: Using cached sequence poses");
+      return cachedResult;
+    }
+    
     // Organize poses by category for more efficient selection
     const organizedPoses = this.organizePosesByCategory(poses);
     
@@ -355,7 +370,15 @@ export const serverSequenceService = {
       console.log("serverSequenceService: Successfully filled sequence with poses");
       
       // Convert to our Sequence format
-      return this.convertToSequenceFormat(filledSequence, structure, params);
+      const result = this.convertToSequenceFormat(filledSequence, structure, params);
+      
+      // Cache the result to prevent duplicate API calls
+      if (!global.__sequence_cache) {
+        global.__sequence_cache = {};
+      }
+      global.__sequence_cache[cacheKey] = result;
+      
+      return result;
     } catch (error) {
       console.error("serverSequenceService: Error parsing filled sequence:", error);
       throw new Error("Failed to parse filled sequence");

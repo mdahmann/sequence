@@ -778,8 +778,14 @@ export default function SequenceEditorPage() {
   // Add effect to complete pose generation if we're viewing a structure-only sequence
   useEffect(() => {
     // Only proceed if we have a structure-only sequence
-    if (sequence && sequence.structureOnly && isPosesLoading) {
+    // Add a ref to track if a request is already in progress to prevent duplicates
+    const isPoseGenerationInProgress = useRef(false);
+    
+    if (sequence && sequence.structureOnly && isPosesLoading && !isPoseGenerationInProgress.current) {
       console.log(`Client: Generating poses for structure-only sequence: ${sequence.id}`);
+      
+      // Set flag to prevent duplicate requests
+      isPoseGenerationInProgress.current = true;
       
       const completePoseGeneration = async () => {
         try {
@@ -793,7 +799,7 @@ export default function SequenceEditorPage() {
               difficulty: sequence.difficulty,
               style: sequence.style,
               focus: sequence.focus,
-              // Send the entire structure for the server to use
+              // Send the full structure to the API
               structure: sequence
             })
           });
@@ -828,6 +834,9 @@ export default function SequenceEditorPage() {
           console.error("Client: Failed to complete pose generation:", error);
           showToast("Failed to generate poses. Please try again later.", "error");
           // Keep loading state, allow user to still work with the structure
+        } finally {
+          // Reset flag regardless of success/failure
+          isPoseGenerationInProgress.current = false;
         }
       };
       
