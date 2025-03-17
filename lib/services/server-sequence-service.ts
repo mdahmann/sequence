@@ -67,8 +67,19 @@ export const serverSequenceService = {
       throw new Error("OpenAI client not initialized");
     }
     
+    // First, prepare the poses data to make it easier to match
+    // In the database, poses have english_name, but we need to match by name for OpenAI
+    const processedPoses = poses.map(pose => ({
+      ...pose,
+      // Ensure each pose has a name property that matches english_name for easier matching
+      name: pose.english_name || pose.name || 'Unknown Pose'
+    }));
+    
+    // Create a list of pose names for the prompt
+    const poseNames = processedPoses.map(pose => pose.name).join(", ");
+    
     // Prepare the prompt for OpenAI
-    const prompt = this.buildPrompt(params, poses);
+    const prompt = this.buildPrompt(params, processedPoses);
     
     // Call OpenAI API to generate a sequence
     console.log("serverSequenceService: Calling OpenAI API");
@@ -139,30 +150,53 @@ export const serverSequenceService = {
         // Map the poses in each phase
         if (Array.isArray(phase.poses)) {
           sequencePhase.poses = phase.poses.map((pose: any, poseIndex: number) => {
-            // Find the matching pose from our database
-            const matchingPose = poses.find(
-              (dbPose) => dbPose.name.toLowerCase() === pose.name.toLowerCase()
-            );
-            
-            // If we couldn't find a matching pose, log a warning but continue
-            if (!matchingPose) {
-              console.warn(`No matching pose found for: ${pose.name}`);
+            const poseName = pose.name?.toLowerCase();
+            if (!poseName) {
+              console.warn(`Pose missing name in OpenAI response:`, pose);
+              // Skip poses without names
+              return null;
             }
             
+            // Find the matching pose from our database - use english_name as the primary matcher
+            const matchingPose = processedPoses.find(
+              (dbPose) => {
+                const dbPoseName = dbPose.name?.toLowerCase();
+                return dbPoseName && dbPoseName === poseName;
+              }
+            );
+            
+            // If we couldn't find a matching pose, log a warning but continue with a placeholder
+            if (!matchingPose) {
+              console.warn(`No matching pose found for: ${pose.name}`);
+              // Create a placeholder pose
+              return {
+                id: uuidv4(),
+                pose_id: "unknown",
+                name: pose.name,
+                duration_seconds: pose.duration_seconds || 30,
+                side: pose.side || null,
+                cues: Array.isArray(pose.cues) ? pose.cues.join(", ") : (pose.cues || ""),
+                position: phaseIndex * 100 + poseIndex + 1,
+                sanskrit_name: undefined,
+                image_url: undefined
+              };
+            }
+            
+            // Create a sequence pose with data from both the OpenAI response and the database
             const sequencePose: SequencePose = {
               id: uuidv4(),
-              pose_id: matchingPose?.id || "unknown",
+              pose_id: matchingPose.id || "unknown",
               name: pose.name,
               duration_seconds: pose.duration_seconds || 30,
               side: pose.side || null,
-              cues: Array.isArray(pose.cues) ? pose.cues.join(", ") : pose.cues || "",
-              position: phaseIndex * 100 + poseIndex + 1, // Generate a position based on phase and pose index
-              sanskrit_name: matchingPose?.sanskrit_name || undefined,
-              image_url: matchingPose?.image_url || undefined
+              cues: Array.isArray(pose.cues) ? pose.cues.join(", ") : (pose.cues || ""),
+              position: phaseIndex * 100 + poseIndex + 1,
+              sanskrit_name: matchingPose.sanskrit_name || undefined,
+              image_url: matchingPose.image_url || undefined
             };
             
             return sequencePose;
-          });
+          }).filter(Boolean) as SequencePose[]; // Filter out any null poses
         }
         
         return sequencePhase;
@@ -299,7 +333,7 @@ export const serverSequenceService = {
   
   buildPrompt(params: SequenceParams, poses: any[]): string {
     // Create a list of available pose names to include in the prompt
-    const poseNames = poses.map(pose => pose.name).join(", ");
+    const poseNames = poses.map(pose => pose.name || pose.english_name || "Unknown Pose").join(", ");
     
     // Add yoga guidelines based on style and focus
     const yogaGuidelines = this.getYogaGuidelines(params.style, params.focus, params.difficulty);
