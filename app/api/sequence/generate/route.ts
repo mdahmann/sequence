@@ -15,6 +15,18 @@ const sequenceParamsSchema = z.object({
 export async function POST(req: NextRequest) {
   console.log("Starting POST request to /api/sequence/generate")
   
+  // Check that environment variables are defined
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    console.error("Missing Supabase environment variables");
+    return NextResponse.json(
+      { 
+        error: "Server configuration error", 
+        message: "The server is not properly configured. Please contact support." 
+      },
+      { status: 500 }
+    )
+  }
+  
   try {
     // Create a Supabase client using cookies from the request
     const cookieStore = req.cookies
@@ -98,28 +110,11 @@ export async function POST(req: NextRequest) {
               // Generate sequence with the authenticated user
               console.log("API route: Generating sequence with token auth...")
               
-              // Create a new Supabase client with the token for this request only
-              const serviceClient = createServerClient(
-                process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                process.env.SUPABASE_SERVICE_ROLE_KEY!,
-                {
-                  cookies: {
-                    get(name: string) { return null },
-                    set(name: string, value: string, options: any) {},
-                    remove(name: string, options: any) {},
-                  },
-                  global: {
-                    headers: {
-                      Authorization: `Bearer ${token}`
-                    }
-                  }
-                }
-              )
+              // No need to create a new client - we already verified the token with the existing client
+              // Just use the original supabase client which already has the token verification
               
-              // Generate the sequence passing in the verified user ID directly
-              const sequence = await serverSequenceService.generateSequence(
-                validatedParams.data
-              )
+              // Generate the sequence directly with the existing client
+              const sequence = await serverSequenceService.generateSequence(validatedParams.data)
               
               // Return generated sequence
               console.log("API route: Sequence generated successfully - returning 201")

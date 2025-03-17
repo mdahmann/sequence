@@ -1,6 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { cookies } from 'next/headers'
-import { OpenAI } from 'openai'
 import { v4 as uuidv4 } from 'uuid'
 import { 
   Sequence, 
@@ -9,14 +8,21 @@ import {
   SequenceParams
 } from '@/types/sequence'
 
-// Create an OpenAI instance
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+// Leave OpenAI for later implementation - for now generate a simple sequence
+// const openai = new OpenAI({
+//   apiKey: process.env.OPENAI_API_KEY,
+// })
 
 export const serverSequenceService = {
   async generateSequence(params: SequenceParams): Promise<Sequence> {
     console.log("serverSequenceService: Generating sequence with params:", params)
+    
+    // Log environment variable availability (without exposing values)
+    console.log("Environment variables check:", {
+      NEXT_PUBLIC_SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      OPENAI_API_KEY: !!process.env.OPENAI_API_KEY
+    })
     
     // Create a server-side Supabase client
     const supabase = createServerSupabaseClient()
@@ -34,52 +40,41 @@ export const serverSequenceService = {
       
       console.log(`serverSequenceService: Successfully fetched ${poses.length} poses from database`)
       
-      // Prepare the prompt for OpenAI
-      const prompt = this.buildPrompt(params, poses)
+      // For now, skip OpenAI and generate a basic sequence
+      // Get a sample of poses based on difficulty and focus
+      const filteredPoses = poses.filter(pose => {
+        // Simple filter matching - will be replaced by OpenAI later
+        const matchesDifficulty = 
+          (params.difficulty === 'beginner' && pose.difficulty_level === 'beginner') ||
+          (params.difficulty === 'intermediate' && 
+            ['beginner', 'intermediate'].includes(pose.difficulty_level || '')) ||
+          (params.difficulty === 'advanced');
+            
+        const matchesFocus = 
+          params.focus === 'full body' || 
+          (pose.category || '').toLowerCase().includes(params.focus);
+            
+        return matchesDifficulty && matchesFocus;
+      });
       
-      // Call OpenAI API to generate a sequence
-      console.log("serverSequenceService: Calling OpenAI API")
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4-turbo",
-        temperature: 0.7,
-        messages: [
-          {
-            role: "system",
-            content: "You are a professional yoga instructor tasked with creating appropriate yoga sequences based on user preferences. You will ONLY use poses from the provided database."
-          },
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        response_format: { type: "json_object" }
-      })
+      // If we don't have enough poses after filtering, use all poses
+      const posesToUse = filteredPoses.length >= 6 ? filteredPoses : poses;
       
-      // Parse the response
-      console.log("serverSequenceService: Received response from OpenAI")
-      const responseContent = completion.choices[0].message.content
-      
-      if (!responseContent) {
-        throw new Error("Empty response from OpenAI")
-      }
-      
-      // Parse the JSON response
-      let generatedSequence: any
-      try {
-        generatedSequence = JSON.parse(responseContent)
-      } catch (error) {
-        console.error("serverSequenceService: Error parsing OpenAI response:", error)
-        console.log("serverSequenceService: Raw response:", responseContent)
-        throw new Error("Failed to parse OpenAI response")
-      }
+      // Calculate poses per phase
+      const totalPoses = Math.min(posesToUse.length, Math.floor(params.duration / 3));
+      const phaseLengths = {
+        warmUp: Math.max(2, Math.floor(totalPoses * 0.3)),
+        mainSequence: Math.max(3, Math.floor(totalPoses * 0.5)),
+        coolDown: Math.max(1, Math.floor(totalPoses * 0.2))
+      };
       
       const now = new Date().toISOString();
       
       // Create a properly formatted sequence object
       const sequence: Sequence = {
         id: uuidv4(),
-        name: generatedSequence.name || `${params.difficulty} ${params.style} Sequence for ${params.focus}`,
-        description: generatedSequence.description || `A ${params.duration} minute ${params.difficulty} ${params.style} yoga sequence focusing on ${params.focus}.`,
+        name: `${params.duration} min ${params.difficulty} ${params.style} for ${params.focus}`,
+        description: `A ${params.duration} minute ${params.difficulty} ${params.style} yoga sequence focusing on ${params.focus}.`,
         duration_minutes: params.duration,
         difficulty: params.difficulty,
         style: params.style,
@@ -91,52 +86,79 @@ export const serverSequenceService = {
         is_favorite: false
       }
       
-      // Process each phase from the generated sequence
-      if (Array.isArray(generatedSequence.phases)) {
-        // Map the generated phases to our Sequence type
-        sequence.phases = generatedSequence.phases.map((phase: any, phaseIndex: number) => {
-          const sequencePhase: SequencePhase = {
+      // Create phases
+      const phaseStructure = [
+        {
+          name: "Warm Up",
+          description: "Gentle poses to prepare the body",
+          count: phaseLengths.warmUp
+        },
+        {
+          name: "Main Sequence",
+          description: "Core yoga practice focusing on " + params.focus,
+          count: phaseLengths.mainSequence
+        },
+        {
+          name: "Cool Down",
+          description: "Gentle poses to finish practice",
+          count: phaseLengths.coolDown
+        }
+      ];
+      
+      // Build phases
+      let poseIndex = 0;
+      sequence.phases = phaseStructure.map((phaseInfo, phaseIndex) => {
+        const sequencePhase: SequencePhase = {
+          id: uuidv4(),
+          name: phaseInfo.name,
+          description: phaseInfo.description,
+          poses: []
+        };
+        
+        // Add poses to this phase
+        for (let i = 0; i < phaseInfo.count && poseIndex < posesToUse.length; i++) {
+          const pose = posesToUse[poseIndex % posesToUse.length];
+          poseIndex++;
+          
+          // For bilateral poses, add both sides
+          const side = pose.is_bilateral ? (i % 2 === 0 ? "right" : "left") : null;
+          
+          const sequencePose: SequencePose = {
             id: uuidv4(),
-            name: phase.name,
-            description: phase.description || "",
-            poses: []
-          }
+            pose_id: pose.id || "unknown",
+            name: pose.name,
+            duration_seconds: 30,
+            side: side,
+            cues: "Focus on proper alignment and breathe deeply",
+            position: phaseIndex * 100 + i + 1,
+            sanskrit_name: pose.sanskrit_name,
+            image_url: pose.image_url
+          };
           
-          // Map the poses in each phase
-          if (Array.isArray(phase.poses)) {
-            sequencePhase.poses = phase.poses.map((pose: any, poseIndex: number) => {
-              // Find the matching pose from our database
-              const matchingPose = poses.find(
-                (dbPose) => dbPose.name.toLowerCase() === pose.name.toLowerCase()
-              )
-              
-              // If we couldn't find a matching pose, log a warning but continue
-              if (!matchingPose) {
-                console.warn(`No matching pose found for: ${pose.name}`)
-              }
-              
-              const sequencePose: SequencePose = {
-                id: uuidv4(),
-                pose_id: matchingPose?.id || "unknown",
-                name: pose.name,
-                duration_seconds: pose.duration_seconds || 30,
-                side: pose.side || null,
-                cues: Array.isArray(pose.cues) ? pose.cues.join(", ") : "",
-                position: phaseIndex * 100 + poseIndex + 1, // Generate a position based on phase and pose index
-                sanskrit_name: matchingPose?.sanskrit_name || undefined,
-                image_url: matchingPose?.image_url || undefined
-              }
-              
-              return sequencePose
-            })
-          }
+          sequencePhase.poses.push(sequencePose);
           
-          return sequencePhase
-        })
-      }
+          // If bilateral, add the second side immediately after
+          if (pose.is_bilateral && side === "right") {
+            const secondSidePose: SequencePose = {
+              id: uuidv4(),
+              pose_id: pose.id || "unknown",
+              name: pose.name,
+              duration_seconds: 30,
+              side: "left",
+              cues: "Focus on proper alignment and breathe deeply",
+              position: phaseIndex * 100 + i + 1.5,
+              sanskrit_name: pose.sanskrit_name,
+              image_url: pose.image_url
+            };
+            sequencePhase.poses.push(secondSidePose);
+          }
+        }
+        
+        return sequencePhase;
+      });
       
       console.log("serverSequenceService: Successfully generated sequence", sequence.name)
-      return sequence
+      return sequence;
       
     } catch (error: any) {
       console.error("serverSequenceService: Error generating sequence:", error.message)
@@ -144,6 +166,9 @@ export const serverSequenceService = {
     }
   },
   
+  // No longer needed with the simplified implementation
+  // Will be used when we reintroduce OpenAI integration
+  /*
   buildPrompt(params: SequenceParams, poses: any[]): string {
     // Create a list of available pose names to include in the prompt
     const poseNames = poses.map(pose => pose.name).join(", ")
@@ -194,6 +219,7 @@ export const serverSequenceService = {
     }
     `
   },
+  */
 
   async setAuthToken(token: string, client: any) {
     // This method can be used to set an auth token directly on the client
