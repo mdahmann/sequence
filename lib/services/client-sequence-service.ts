@@ -13,10 +13,14 @@ export const clientSequenceService = {
     console.log("clientSequenceService: Generating sequence with params:", params);
     
     try {
+      // Get the authentication token from localStorage
+      const authToken = localStorage.getItem("supabase.auth.token");
+      
       const response = await fetch(`/api/sequence/generate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": authToken ? `Bearer ${authToken}` : "",
         },
         body: JSON.stringify(params),
         credentials: "include",

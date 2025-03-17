@@ -15,58 +15,125 @@ const sequenceParamsSchema = z.object({
 export async function POST(req: NextRequest) {
   console.log("Starting POST request to /api/sequence/generate")
   
-  // Create a Supabase client using cookies from the request
-  const cookieStore = req.cookies
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value
-        },
-      },
-    }
-  )
-  
-  // Log available cookies for debugging
-  console.log("Available cookies:", cookieStore.getAll().map(c => c.name).join(', '))
-  
-  // Check authentication
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-  
-  if (sessionError) {
-    console.error("API route: Error getting session:", sessionError)
-    return NextResponse.json(
-      { 
-        error: "Authentication error", 
-        message: "There was an error checking your authentication status." 
-      },
-      { status: 500 }
-    )
-  }
-  
-  if (!session?.user?.id) {
-    console.log("API route: User not authenticated - returning 401")
-    return NextResponse.json(
-      { 
-        error: "Authentication required", 
-        message: "Please sign in or create an account to generate sequences." 
-      },
-      { status: 401 }
-    )
-  }
-  
-  console.log(`API route: User authenticated with ID ${session.user.id}`)
-  console.log("API route: Auth details:", {
-    userId: session.user.id,
-    email: session.user.email || 'not available',
-    provider: session.user.app_metadata?.provider || 'unknown',
-    aud: session.user.aud,
-    role: session.user.role
-  })
-  
   try {
+    // Create a Supabase client using cookies from the request
+    const cookieStore = req.cookies
+    console.log("Available cookies:", cookieStore.getAll().map(c => `${c.name}=${c.value.substring(0,10)}...`).join(', '))
+    
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name: string) {
+            return cookieStore.get(name)?.value
+          },
+          set(name: string, value: string, options: any) {
+            // This is unused in the API route but required by the type
+          },
+          remove(name: string, options: any) {
+            // This is unused in the API route but required by the type
+          },
+        },
+      }
+    )
+    
+    // Check authentication
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    
+    if (sessionError) {
+      console.error("API route: Error getting session:", sessionError)
+      return NextResponse.json(
+        { 
+          error: "Authentication error", 
+          message: "There was an error checking your authentication status." 
+        },
+        { status: 500 }
+      )
+    }
+    
+    if (!session?.user?.id) {
+      console.log("API route: No valid session found")
+      
+      // Attempt to use the service role client if session is not available
+      // This is a fallback mechanism
+      console.log("API route: Trying to retrieve user with service role client")
+      const headers = Object.fromEntries(req.headers.entries());
+      console.log("Request headers:", headers);
+      
+      // Try to extract user ID from Authorization header if present
+      const authHeader = req.headers.get('authorization');
+      console.log("Auth header:", authHeader ? "Present" : "Not present");
+      
+      // If we have an Authorization header, use it to authenticate
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+        try {
+          // Set the auth token directly
+          await serverSequenceService.setAuthToken(token, supabase);
+          
+          // Get the user to verify authentication worked
+          const { data: userData, error: userError } = await supabase.auth.getUser();
+          
+          if (userData?.user && !userError) {
+            console.log("API route: Successfully authenticated with token from header");
+            console.log("API route: User ID from token:", userData.user.id);
+            
+            // Continue with the authenticated user
+            try {
+              // Parse and validate request body
+              const body = await req.json()
+              const validatedParams = sequenceParamsSchema.safeParse(body)
+              
+              if (!validatedParams.success) {
+                console.log("API route: Invalid parameters - returning 400")
+                return NextResponse.json(
+                  { error: "Invalid parameters", details: validatedParams.error.format() },
+                  { status: 400 }
+                )
+              }
+              
+              // Generate sequence with the authenticated user
+              console.log("API route: Generating sequence with token auth...")
+              const sequence = await serverSequenceService.generateSequence(validatedParams.data)
+              
+              // Return generated sequence
+              console.log("API route: Sequence generated successfully - returning 201")
+              return NextResponse.json(
+                { sequence }, 
+                { status: 201 }
+              )
+            } catch (error: any) {
+              console.error("API route token error:", error.message)
+              return NextResponse.json(
+                { error: "Token processing error", message: error.message },
+                { status: 500 }
+              )
+            }
+          }
+        } catch (tokenError) {
+          console.error("API route: Error verifying token:", tokenError);
+        }
+      }
+      
+      return NextResponse.json(
+        { 
+          error: "Authentication required", 
+          message: "Please sign in or create an account to generate sequences." 
+        },
+        { status: 401 }
+      )
+    }
+    
+    console.log(`API route: User authenticated with ID ${session.user.id}`)
+    console.log("API route: Auth details:", {
+      userId: session.user.id,
+      email: session.user.email || 'not available',
+      provider: session.user.app_metadata?.provider || 'unknown',
+      aud: session.user.aud,
+      role: session.user.role
+    })
+    
     // Parse and validate request body
     const body = await req.json()
     const validatedParams = sequenceParamsSchema.safeParse(body)

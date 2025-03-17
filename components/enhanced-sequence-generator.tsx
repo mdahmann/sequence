@@ -5,73 +5,65 @@ import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { EnhancedSlider } from "./ui-enhanced/slider"
 import { LoadingSpinner } from "./ui-enhanced/loading-spinner"
-import { useToast } from "./ui-enhanced/toast-provider"
+import { useToast } from "@/components/ui/use-toast"
 import { clientSequenceService, APIError } from "@/lib/services/client-sequence-service"
 import { Sequence, SequenceParams } from "@/types/sequence"
 import { cn } from "@/lib/utils"
 import { useSupabase } from "@/components/providers"
+import { Button } from "@/components/ui/button"
+import { Slider } from "@/components/ui/slider"
+import { Textarea } from "@/components/ui/textarea"
+import { Card, CardContent } from "@/components/ui/card"
+import { Progress } from "@/components/ui/progress"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 // Define options for each form field
-const difficultyOptions = [
-  { value: "beginner", label: "Beginner", description: "Gentle practice suitable for beginners with basic poses" },
-  { value: "intermediate", label: "Intermediate", description: "Moderate intensity with some challenging poses" },
-  { value: "advanced", label: "Advanced", description: "Challenging practice with complex poses and sequences" },
-]
-
-const styleOptions = [
-  { value: "vinyasa", label: "Vinyasa Flow" },
-  { value: "hatha", label: "Hatha" },
-  { value: "yin", label: "Yin" },
-  { value: "power", label: "Power" },
-  { value: "restorative", label: "Restorative" },
-]
-
+const difficultyOptions = ["beginner", "intermediate", "advanced"] as const
+const styleOptions = ["vinyasa", "hatha", "yin", "power", "restorative"] as const
 const focusOptions = [
-  { value: "full body", label: "Full Body" },
-  { value: "upper body", label: "Upper Body" },
-  { value: "lower body", label: "Lower Body" },
-  { value: "core", label: "Core" },
-  { value: "balance", label: "Balance" },
-  { value: "flexibility", label: "Flexibility" },
-]
+  "full body",
+  "upper body",
+  "lower body",
+  "core",
+  "balance",
+  "flexibility",
+] as const
 
 export function EnhancedSequenceGenerator() {
   const router = useRouter()
-  
-  // Form state
-  const [duration, setDuration] = useState(30)
-  const [difficulty, setDifficulty] = useState<string>("intermediate")
-  const [style, setStyle] = useState<string>("vinyasa")
-  const [focus, setFocus] = useState<string>("full body")
-  const [additionalNotes, setAdditionalNotes] = useState("")
-  
-  // UI state
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [generatedSequence, setGeneratedSequence] = useState<Sequence | null>(null)
-  
-  // Use toast notification system
-  const { showToast } = useToast()
-  
-  // Use Supabase
+  const { toast } = useToast()
   const { supabase, isAuthenticated } = useSupabase()
   
-  // Log authentication status when component mounts
+  // Form state
+  const [duration, setDuration] = useState<number>(30)
+  const [difficulty, setDifficulty] = useState<(typeof difficultyOptions)[number]>("intermediate")
+  const [style, setStyle] = useState<(typeof styleOptions)[number]>("vinyasa")
+  const [focus, setFocus] = useState<(typeof focusOptions)[number]>("full body")
+  const [additionalNotes, setAdditionalNotes] = useState<string>("")
+  
+  // UI state
+  const [isGenerating, setIsGenerating] = useState<boolean>(false)
+  const [generatedSequence, setGeneratedSequence] = useState<Sequence | null>(null)
+  const [tabValue, setTabValue] = useState<string>("generate")
+  
+  // Debug authentication status
   useEffect(() => {
-    async function checkAuthStatus() {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        console.log("Client Auth Status:", { 
-          isAuthenticated, 
-          userId: session?.user?.id || 'none',
-          email: session?.user?.email || 'none',
-          provider: session?.user?.app_metadata?.provider || 'none'
-        })
-      } catch (error) {
-        console.error("Error checking auth status:", error)
+    async function checkAuthDetails() {
+      const { data: { session } } = await supabase.auth.getSession()
+      console.log("Client Auth Status:", {
+        isAuthenticated,
+        userId: session?.user?.id,
+        email: session?.user?.email,
+        provider: session?.user?.app_metadata?.provider || "unknown"
+      })
+      
+      // Store the session token in localStorage for API requests
+      if (session?.access_token) {
+        localStorage.setItem("supabase.auth.token", session.access_token)
       }
     }
     
-    checkAuthStatus()
+    checkAuthDetails()
   }, [supabase, isAuthenticated])
   
   // Handler to navigate to sequence editor
@@ -103,109 +95,81 @@ export function EnhancedSequenceGenerator() {
     }
   }
   
-  // Generate sequence based on form inputs
+  // Handle sequence generation
   const handleGenerateSequence = async () => {
-    setIsGenerating(true)
-    setGeneratedSequence(null)
-    
     try {
-      // Get and log the current session information
-      const { data: { session } } = await supabase.auth.getSession()
+      // First, check if user is authenticated
       console.log("Generate sequence - Auth details:", {
-        isAuthenticated,
-        sessionExists: !!session,
-        userId: session?.user?.id || 'none',
-        email: session?.user?.email || 'none'
+        isAuthenticated: isAuthenticated,
+        sessionExists: !!(await supabase.auth.getSession()).data.session,
+        sessionData: (await supabase.auth.getSession()).data.session
       })
       
-      // First check if user is already logged in using the useSupabase hook
-      // This is a client-side check before making the API call
       if (!isAuthenticated) {
-        console.log("Client-side auth check: User not authenticated");
-        showToast(
-          "Please sign in or create an account to generate sequences",
-          "auth",
-          12000, // Show for longer (12 seconds)
-          "center", // Display in center of screen
-          [
-            {
-              label: "Sign In",
-              onClick: () => router.push("/login")
-            },
-            {
-              label: "Sign Up",
-              onClick: () => router.push("/signup")
-            }
-          ]
-        );
-        setIsGenerating(false);
-        return;
+        console.log("Client-side auth check: User is not authenticated")
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in or create an account to generate sequences.",
+          variant: "destructive",
+        })
+        return
       }
       
-      console.log("Client-side auth check: User is authenticated");
+      console.log("Client-side auth check: User is authenticated")
+      
+      // Set loading state
+      setIsGenerating(true)
       
       const params: SequenceParams = {
         duration,
-        difficulty: difficulty as "beginner" | "intermediate" | "advanced",
-        style: style as "vinyasa" | "hatha" | "yin" | "power" | "restorative",
-        focus: focus as "full body" | "upper body" | "lower body" | "core" | "balance" | "flexibility",
-        additionalNotes: additionalNotes || undefined,
+        difficulty,
+        style,
+        focus,
+        additionalNotes: additionalNotes.trim() || undefined,
       }
       
-      console.log("Generating sequence with params:", params);
+      console.log("Generating sequence with params:", params)
+      
+      // Generate sequence
       const sequence = await clientSequenceService.generateSequence(params)
       
-      // Save the sequence to localStorage for the beta version
+      // Update state
+      setGeneratedSequence(sequence)
+      setTabValue("result")
+      
+      // Save to local storage for beta version
       saveSequenceToLocalStorage(sequence)
       
-      showToast("Sequence generated successfully!", "success")
-      
-      // Automatically redirect to the editor page
+      // Navigate to editor
       router.push(`/edit/${sequence.id}`)
+    } catch (error: any) {
+      console.error("Sequence generation error:", error)
       
-    } catch (error) {
-      console.error("Sequence generation error:", error);
-      
-      // Handle specific error types
-      const apiError = error as APIError;
-      
-      // Authentication errors (401)
-      if (apiError.status === 401) {
-        console.log("Authentication error detected");
-        showToast(
-          "Please sign in or create an account to generate sequences",
-          "auth",
-          12000, // Show for longer (12 seconds)
-          "center", // Display in center of screen
-          [
-            {
-              label: "Sign In",
-              onClick: () => router.push("/login")
-            },
-            {
-              label: "Sign Up",
-              onClick: () => router.push("/signup")
-            }
-          ]
-        );
-        return;
-      } 
-      
-      // User account issues (403)
-      if (apiError.status === 403) {
-        console.log("User account issue detected");
-        showToast(
-          "Your user account is not properly set up. Please contact support.",
-          "error"
-        );
-        return;
-      } 
-      
-      // Handle all other errors
-      const errorMessage = apiError.message || "Failed to generate sequence";
-      console.log("Showing generic error toast:", errorMessage);
-      showToast(errorMessage, "error");
-      
+      if (error.status === 401) {
+        console.log("Authentication error detected")
+        
+        // Check if we have a session but still get 401
+        const { data: sessionData } = await supabase.auth.getSession() 
+        if (sessionData.session) {
+          console.log("Session exists but got 401 - refreshing token")
+          // Try to refresh the token
+          await supabase.auth.refreshSession()
+          // Store updated token
+          localStorage.setItem("supabase.auth.token", sessionData.session.access_token)
+        }
+        
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in or create an account to generate sequences.",
+          variant: "destructive",
+        })
+      } else {
+        toast({
+          title: "Error Generating Sequence",
+          description: error.message || "An unexpected error occurred",
+          variant: "destructive",
+        })
+      }
     } finally {
       setIsGenerating(false)
     }
@@ -240,22 +204,17 @@ export function EnhancedSequenceGenerator() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {difficultyOptions.map((option) => (
                 <button
-                  key={option.value}
+                  key={option}
                   type="button"
-                  onClick={() => setDifficulty(option.value)}
+                  onClick={() => setDifficulty(option)}
                   className={cn(
                     "relative border rounded-lg p-4 cursor-pointer transition-all duration-200",
-                    difficulty === option.value
+                    difficulty === option
                       ? "border-vibrant-blue bg-vibrant-blue/5"
                       : "border-gray-200 dark:border-gray-700 hover:border-vibrant-blue/50"
                   )}
                 >
-                  <div className="font-medium">{option.label}</div>
-                  {option.description && (
-                    <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                      {option.description}
-                    </div>
-                  )}
+                  <div className="font-medium">{option}</div>
                 </button>
               ))}
             </div>
@@ -269,17 +228,17 @@ export function EnhancedSequenceGenerator() {
             <div className="flex flex-wrap gap-2">
               {styleOptions.map((option) => (
                 <button
-                  key={option.value}
+                  key={option}
                   type="button"
-                  onClick={() => setStyle(option.value)}
+                  onClick={() => setStyle(option)}
                   className={cn(
                     "px-4 py-2 rounded-full border-2 transition-colors",
-                    style === option.value
+                    style === option
                       ? "border-vibrant-blue bg-vibrant-blue/10 text-vibrant-blue"
                       : "border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
                   )}
                 >
-                  {option.label}
+                  {option}
                 </button>
               ))}
             </div>
@@ -293,17 +252,17 @@ export function EnhancedSequenceGenerator() {
             <div className="flex flex-wrap gap-2">
               {focusOptions.map((option) => (
                 <button
-                  key={option.value}
+                  key={option}
                   type="button"
-                  onClick={() => setFocus(option.value)}
+                  onClick={() => setFocus(option)}
                   className={cn(
                     "px-4 py-2 rounded-full border-2 transition-colors",
-                    focus === option.value
+                    focus === option
                       ? "border-vibrant-blue bg-vibrant-blue/10 text-vibrant-blue"
                       : "border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
                   )}
                 >
-                  {option.label}
+                  {option}
                 </button>
               ))}
             </div>

@@ -29,7 +29,13 @@ export const serverSequenceService = {
       throw new Error("Authentication required")
     }
     
-    console.log("serverSequenceService: Authentication successful, user:", session.user.email)
+    console.log("serverSequenceService: Authentication successful, user:", 
+      {
+        id: session.user.id,
+        email: session.user.email,
+        provider: session.user.app_metadata?.provider || 'unknown'
+      }
+    )
     
     try {
       // Fetch all poses from the database
@@ -203,5 +209,14 @@ export const serverSequenceService = {
       ]
     }
     `
-  }
+  },
+
+  async setAuthToken(token: string, client: any) {
+    // This method can be used to set an auth token directly on the client
+    // Useful for API routes that receive an Authorization header
+    return await client.auth.setSession({
+      access_token: token,
+      refresh_token: "",
+    });
+  },
 } 
