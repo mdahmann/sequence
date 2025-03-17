@@ -1,5 +1,6 @@
 import { Metadata } from "next"
 import { EnhancedSequenceGenerator } from "@/components/enhanced-sequence-generator"
+import { EnhancedToastProvider } from "@/components/ui-enhanced/toast-provider"
 
 export const metadata: Metadata = {
   title: "Generate Sequence | Sequence",
@@ -66,7 +67,9 @@ export default function GeneratePage() {
       </div>
       
       <div className="lg:col-span-8">
-        <EnhancedSequenceGenerator />
+        <EnhancedToastProvider>
+          <EnhancedSequenceGenerator />
+        </EnhancedToastProvider>
       </div>
     </div>
   )
