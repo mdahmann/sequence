@@ -10,62 +10,34 @@ export interface APIError {
 
 export const clientSequenceService = {
   async generateSequence(params: SequenceParams): Promise<Sequence> {
+    console.log("clientSequenceService: Generating sequence with params:", params);
+    
     try {
-      console.log("Making API request to generate sequence:", params);
-      
-      const response = await fetch('/api/sequence/generate', {
-        method: 'POST',
+      const response = await fetch(`/api/sequence/generate`, {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        credentials: 'include', // Include authentication cookies
         body: JSON.stringify(params),
-      })
+        credentials: "include",
+      });
 
       if (!response.ok) {
-        let errorMessage = 'Failed to generate sequence';
-        let errorDetails = null;
-        
-        // Try to parse the error response
-        try {
-          const errorData = await response.json();
-          // Use the server message if available, otherwise fallback to status text
-          errorMessage = errorData.message || errorData.error || response.statusText || errorMessage;
-          errorDetails = errorData.details;
-          
-          console.log('Received API error:', {
-            status: response.status,
-            message: errorMessage,
-            details: errorDetails
-          });
-        } catch (parseError) {
-          console.error('Failed to parse error response:', parseError);
-        }
-        
-        // Throw a well-formed error object
+        const errorText = await response.text();
+        console.error("API Response Error:", response.status, errorText);
         throw {
-          message: errorMessage,
+          message: `Failed to generate sequence: ${response.status} ${response.statusText}`,
           status: response.status,
-          details: errorDetails,
+          details: { errorText }
         } as APIError;
       }
 
-      const data = await response.json()
-      return data.sequence
-    } catch (error) {
-      // If this is already a properly formatted API error, just rethrow it
-      if (error && typeof error === 'object' && 'status' in error && 'message' in error) {
-        console.log('Rethrowing API error:', error);
-        throw error;
-      }
-      
-      // Otherwise, format as a generic error
-      console.error('Unhandled error in sequence generation:', error);
-      throw {
-        message: error instanceof Error ? error.message : 'An unexpected error occurred',
-        status: 0,
-        details: { originalError: error },
-      } as APIError;
+      const data = await response.json();
+      console.log("clientSequenceService: Sequence generated successfully");
+      return data.sequence;
+    } catch (error: any) {
+      console.error("clientSequenceService: Error generating sequence:", error);
+      throw error;
     }
   },
 } 
