@@ -13,6 +13,7 @@ interface SequencePose {
   duration_seconds: number
   position: number
   side?: "left" | "right" | "both" | null
+  side_option?: string | null
   image_url?: string
 }
 
@@ -100,7 +101,8 @@ export function SortablePoseItem({
             <div>
               <div className="font-medium flex items-center">
                 {pose.name}
-                {pose.side && (
+                {/* Only show side toggle if the pose is a bilateral pose (has a valid side) */}
+                {pose.side && pose.side_option && (
                   <button 
                     onClick={() => onSideToggle?.(pose.id)}
                     className={cn(

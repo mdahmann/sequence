@@ -5,7 +5,7 @@ import { useParams, useRouter, notFound } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { LoadingSpinner } from "@/components/ui-enhanced/loading-spinner"
 import { useToast } from "@/components/ui-enhanced/toast-provider"
-import { Sequence, SequencePhase, SequencePose } from "@/types/sequence"
+import { Sequence, SequencePhase } from "@/types/sequence"
 import { cn } from "@/lib/utils"
 import { Skeleton, PoseSkeleton } from "@/components/ui-enhanced/skeleton"
 import { ChevronDown, ChevronRight, ChevronLeft, Plus, Pencil, Download, RotateCcw, RotateCw, History, X, Save } from "lucide-react"
@@ -38,7 +38,20 @@ interface PoseData {
   sanskrit_name: string | null
   category: string | null
   difficulty: string | null
-  side_option: boolean
+  side_option: string | null
+}
+
+// Extend the SequencePose type to include side_option
+interface SequencePose {
+  id: string
+  pose_id: string
+  name: string
+  sanskrit_name?: string
+  duration_seconds: number
+  position: number
+  side?: "left" | "right" | "both" | null
+  side_option?: string | null
+  image_url?: string
 }
 
 export default function SequenceEditorPage() {
@@ -728,7 +741,10 @@ export default function SequenceEditorPage() {
             sanskrit_name: poseData.sanskrit_name || undefined,
             duration_seconds: 30,
             position: 0, // Will be updated below
-            side: poseData.side_option ? "left" : null
+            // Only set side if the pose has a valid side option
+            side: poseData.side_option === "left_right" || poseData.side_option === "both" ? "left" : null,
+            // Store the original side_option value for future reference
+            side_option: poseData.side_option
           };
           
           let updatedPoses = [...phase.poses];
@@ -1040,8 +1056,19 @@ export default function SequenceEditorPage() {
   };
   
   // Re-adding handlePoseSelect functionality
-  const handlePoseSelect = (poseData: PoseData) => {
+  const handlePoseSelect = (pose: any) => {
     if (!sequence) return;
+    
+    // Convert boolean side_option to string format for consistency
+    const adaptedPoseData: PoseData = {
+      id: pose.id,
+      name: pose.name,
+      sanskrit_name: pose.sanskrit_name,
+      category: pose.category,
+      difficulty: pose.difficulty, 
+      // Convert boolean to appropriate string value
+      side_option: pose.side_option === true ? "left_right" : null
+    };
     
     const selectedPhase = sequence.phases[selectedPhaseIndex];
     
@@ -1053,7 +1080,7 @@ export default function SequenceEditorPage() {
       preventDefault: () => {},
       stopPropagation: () => {},
       dataTransfer: {
-        getData: () => JSON.stringify(poseData)
+        getData: () => JSON.stringify(adaptedPoseData)
       }
     } as unknown as React.DragEvent<HTMLDivElement>;
     
@@ -1255,22 +1282,22 @@ export default function SequenceEditorPage() {
               <div className="px-2 py-2">
                 <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2 px-3">Sequence Phases</div>
                 <div className="space-y-1">
-                  {sequence.phases.map((phase, index) => (
+                  {sequence.phases.map((phase, phaseIndex) => (
                     <button
                       key={phase.id}
-                      onClick={() => handlePhaseSelect(index, phase.id)}
+                      onClick={() => handlePhaseSelect(phaseIndex, phase.id)}
                       className={cn(
                         "w-full text-left px-3 py-2 rounded-md transition-colors whitespace-nowrap",
-                        selectedPhaseIndex === index 
+                        selectedPhaseIndex === phaseIndex 
                           ? "bg-vibrant-blue/10 text-vibrant-blue"
                           : "hover:bg-gray-100 dark:hover:bg-gray-800"
                       )}
                     >
                       <div className="flex items-center">
-                        <div className="w-5 h-5 flex items-center justify-center rounded-full bg-primary/10 text-primary mr-2 text-xs">
-                          {index + 1}
+                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary mr-3">
+                          {phaseIndex + 1}
                         </div>
-                        <span className="truncate">{phase.name}</span>
+                        <h3 className="text-lg font-medium">{phase.name}</h3>
                       </div>
                     </button>
                   ))}
