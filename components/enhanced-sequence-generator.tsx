@@ -8,7 +8,7 @@ import { LoadingSpinner } from "./ui-enhanced/loading-spinner"
 import { useToast as useShadcnToast } from "@/components/ui/use-toast"
 import { useToast as useEnhancedToast } from "@/components/ui-enhanced/toast-provider"
 import { clientSequenceService, APIError } from "@/lib/services/client-sequence-service"
-import { Sequence, SequenceParams } from "@/types/sequence"
+import { Sequence, SequenceParams, SequencePhase } from "@/types/sequence"
 import { cn } from "@/lib/utils"
 import { useSupabase } from "@/components/providers"
 import { Button } from "@/components/ui/button"
@@ -256,35 +256,36 @@ export function EnhancedSequenceGenerator() {
   
   const handleCompletedSequence = (completedSequence: Sequence) => {
     // Preserve original phases and just update poses
-    setGeneratedSequence(prevSequence => {
-      const updatedSequence = {...prevSequence};
+    setGeneratedSequence((prevSequence: Sequence | null): Sequence => {
+      if (!prevSequence) return completedSequence;
+      
+      // Create a deep copy of the previous sequence
+      const updatedSequence: Sequence = {
+        ...prevSequence,
+        phases: [...(prevSequence.phases || [])]
+      };
       
       // Map the poses from completed sequence to the original phases
-      // Assuming each phase in completedSequence corresponds to original phases
-      updatedSequence.phases = prevSequence.phases.map((phase, index) => {
-        // If AI somehow reduced phases, handle that case
-        const correspondingPhase = index < completedSequence.phases.length 
-          ? completedSequence.phases[index] 
-          : null;
-          
-        if (correspondingPhase) {
-          // Preserve original phase ID and metadata, just update poses
-          return {
-            ...phase,
-            poses: correspondingPhase.poses
-          };
-        }
-        return phase;
-      });
+      if (updatedSequence.phases && updatedSequence.phases.length > 0) {
+        updatedSequence.phases = updatedSequence.phases.map((phase, index) => {
+          // If AI somehow reduced phases, handle that case
+          const correspondingPhase = index < completedSequence.phases.length 
+            ? completedSequence.phases[index] 
+            : null;
+            
+          if (correspondingPhase) {
+            // Preserve original phase ID and metadata, just update poses
+            return {
+              ...phase,
+              poses: correspondingPhase.poses || []
+            };
+          }
+          return phase;
+        });
+      }
       
       return updatedSequence;
     });
-    
-    // Make sure all phases remain expanded
-    setGeneratedSequence(prevSequence => ({
-      ...prevSequence,
-      phases: prevSequence.phases.map(phase => phase.id)
-    }));
   }
   
   return (

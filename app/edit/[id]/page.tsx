@@ -1203,26 +1203,17 @@ export default function SequenceEditorPage() {
                   })
                 };
                 
-                // Store all original phase IDs for expansion
-                const allPhaseIds = preservedSequence.phases.map(phase => phase.id);
-                console.log("Complete sequence with PRESERVED phase structure:", JSON.stringify({
-                  id: preservedSequence.id,
+                // Extract just the phase IDs for logging
+                console.log(`Complete sequence with PRESERVED phase structure:`, {
+                  id: preservedSequence.id, 
                   name: preservedSequence.name,
                   phaseCount: preservedSequence.phases.length,
-                  phaseIds: allPhaseIds
-                }));
+                  phaseIds: preservedSequence.phases.map(p => p.id),
+                });
                 
-                // Schedule expanded phases update after render
-                setTimeout(() => {
-                  console.log("Setting ALL expanded phases:", allPhaseIds);
-                  // Force override with all phase IDs
-                  setExpandedPhases(allPhaseIds);
-                  
-                  // Double-check the state was updated after a short delay
-                  setTimeout(() => {
-                    console.log("Current expanded phases after update:", expandedPhases);
-                  }, 100);
-                }, 10);
+                // Update expanded phases to match the current phase IDs
+                const currentPhaseIds = preservedSequence.phases.map(phase => phase.id);
+                setExpandedPhases(currentPhaseIds);
                 
                 return preservedSequence;
               });
@@ -1255,6 +1246,15 @@ export default function SequenceEditorPage() {
     }
   }, [sequence, isPosesLoading, showToast, expandedPhases]);
   
+  // Add effect to ensure expandedPhases stay in sync with current phase IDs
+  useEffect(() => {
+    if (sequence && sequence.phases) {
+      const allPhaseIds = sequence.phases.map(phase => phase.id);
+      console.log(`Setting ALL expanded phases:`, allPhaseIds);
+      setExpandedPhases(allPhaseIds);
+    }
+  }, [sequence?.id, !sequence?.structureOnly]); // Only run when sequence ID changes or it's no longer structureOnly
+  
   // Helper function to find a pose by ID
   const findPoseById = (poseId: string): SequencePose | null => {
     if (!sequence) return null;
@@ -1266,31 +1266,6 @@ export default function SequenceEditorPage() {
     
     return null;
   };
-  
-  // Effect to ensure all phases remain expanded after any sequence updates
-  useEffect(() => {
-    if (sequence && sequence.phases && sequence.phases.length > 0) {
-      // Get all phase IDs from the current sequence
-      const allPhaseIds = sequence.phases.map(phase => phase.id);
-      
-      // Check if we need to update expanded phases
-      const needsUpdate = (
-        // Either we don't have any expanded phases yet
-        expandedPhases.length === 0 ||
-        // Or we have the wrong number of expanded phases
-        expandedPhases.length !== allPhaseIds.length ||
-        // Or we have different phase IDs than what's in the sequence
-        !allPhaseIds.every(id => expandedPhases.includes(id))
-      );
-      
-      if (needsUpdate) {
-        console.log("Ensuring all phases are expanded:", allPhaseIds);
-        setTimeout(() => {
-          setExpandedPhases(allPhaseIds);
-        }, 100);
-      }
-    }
-  }, [sequence, expandedPhases]);
   
   // Handle pose selection from sidebar
   const handlePoseSelect = (pose: any) => {
