@@ -1179,10 +1179,26 @@ export default function SequenceEditorPage() {
                     // Preserve the original phase ID and metadata
                     return {
                       ...originalPhase,
-                      poses: phasePoses.map((pose: SequencePose, poseIdx: number) => ({
-                        ...pose,
-                        position: poseIdx + 1, // Ensure positions are sequential
-                      }))
+                      poses: phasePoses.map((pose: SequencePose, poseIdx: number) => {
+                        // Preserve ALL pose properties, especially side and side_option
+                        // Make sure we keep these important bilateral properties
+                        if (!pose.side && pose.side_option === "left_right") {
+                          // If the pose has a left_right option but no side was assigned,
+                          // default to 'left' side for the first occurrence
+                          console.log(`Setting default 'left' side for bilateral pose: ${pose.name}`);
+                          return {
+                            ...pose,
+                            side: "left", // Assign a default side
+                            position: poseIdx + 1, // Ensure positions are sequential
+                          };
+                        }
+                        
+                        // Keep all existing properties including side info
+                        return {
+                          ...pose,
+                          position: poseIdx + 1, // Ensure positions are sequential
+                        };
+                      })
                     };
                   })
                 };

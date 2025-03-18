@@ -339,18 +339,21 @@ export const serverSequenceService = {
          - name (for reference only, must match a name from the provided list)
          - sanskrit_name (for reference only)
          - duration_seconds (how long to hold the pose)
-         - side (if applicable, either "left", "right", "both", or null)
+         - side (CRUCIAL: for bilateral poses, MUST BE "left", "right", or "both"; otherwise null)
+         - side_option (MUST BE "left_right" for bilateral poses that are done on either side)
          - transition (brief instruction on how to move to this pose)
          - cues (array of alignment and breath cues)
       5. Bilateral poses (poses that can be done on either side) should:
-         - Be clearly marked with a side value ("left", "right", or "both")
-         - Generally be repeated on both sides sequentially in the practice
+         - ALWAYS include side_option: "left_right"
+         - ALWAYS specify a specific side value ("left" or "right")
+         - Generally be repeated on both sides sequentially in the practice (first left, then right)
+         - Examples of bilateral poses: Triangle, Side Angle, Warrior I/II/III, Half Moon, etc.
       6. Use simple, clear English for ALL phase/segment names - DO NOT use Sanskrit terms for section titles
       ${params.peakPose ? `7. Include the peak pose "${params.peakPose.name}" at an appropriate point in the sequence with proper preparation and counter poses` : ''}
       
       CRITICAL: When you include pose information, include the exact pose ID from the database, not just the name.
-      Here is a reference list of pose IDs with their names:
-      ${poses.slice(0, 30).map(p => `ID: ${p.id} - Name: ${p.name} (${p.sanskrit_name || 'No Sanskrit name'})`).join("\n")}
+      Here is a reference list of pose IDs with their names and side options:
+      ${poses.slice(0, 30).map(p => `ID: ${p.id} - Name: ${p.name} (${p.sanskrit_name || 'No Sanskrit name'})${p.bilateral ? ' - BILATERAL (requires side_option: "left_right")' : ''}`).join("\n")}
       ... (plus additional poses not shown for brevity)
     `;
     
@@ -706,7 +709,7 @@ export const serverSequenceService = {
       return this.getFallbackGuidelines(style, focus, difficulty);
     }
   },
-  
+   
   // This is the original implementation as a fallback
   getFallbackGuidelines(style: string, focus: string, difficulty: string): string {
     // Common principles
@@ -811,4 +814,4 @@ export const serverSequenceService = {
       refresh_token: "",
     });
   },
-} 
+}
