@@ -352,6 +352,9 @@ export const serverSequenceService = {
       ${params.peakPose ? `7. Include the peak pose "${params.peakPose.name}" at an appropriate point in the sequence with proper preparation and counter poses` : ''}
       
       CRITICAL: When you include pose information, include the exact pose ID from the database, not just the name.
+      
+      EXTREMELY IMPORTANT: You MUST generate exactly ${(structure as any).phases?.length || structure.segments.length} phases/segments. Do not create more or fewer phases than in the original structure. Keep the exact same phase names and purposes as in the original structure.
+      
       Here is a reference list of pose IDs with their names and side options:
       ${poses.slice(0, 30).map(p => `ID: ${p.id} - Name: ${p.name} (${p.sanskrit_name || 'No Sanskrit name'})${p.bilateral ? ' - BILATERAL (requires side_option: "left_right")' : ''}`).join("\n")}
       ... (plus additional poses not shown for brevity)
@@ -452,62 +455,158 @@ export const serverSequenceService = {
       notes: structure.intention || params.additionalNotes || "",
     };
     
-    // Process each phase/segment from the filled sequence
-    if (Array.isArray(filledSequence.phases)) {
-      sequence.phases = filledSequence.phases.map((phase: any, phaseIndex: number) => {
-        const sequencePhase: SequencePhase = {
-          id: uuidv4(),
-          name: phase.name,
-          description: phase.description || "",
-          poses: []
-        };
-        
-        // Map the poses in each phase
-        if (Array.isArray(phase.poses)) {
-          sequencePhase.poses = phase.poses.map((pose: any, poseIndex: number) => {
-            // Get the database pose ID, validate it exists
-            let poseId = pose.id || pose.pose_id || "unknown";
-            
-            // If we have the database poses, verify the ID exists
-            if (poseIdMap.size > 0) {
-              // If the ID doesn't exist but we have the name, try to find the pose by name
-              if (!poseIdMap.has(poseId) && pose.name) {
-                const poseName = pose.name.toLowerCase();
-                // Find the first pose with a matching name
-                const matchingPose = Array.from(poseIdMap.values()).find(
-                  (p) => p.name?.toLowerCase() === poseName
-                );
-                if (matchingPose) {
-                  poseId = matchingPose.id;
-                  console.log(`Mapped pose name "${pose.name}" to ID ${poseId}`);
+    // Check if we have a phase count mismatch and log it
+    const originalPhases = (structure as any).phases || [];
+    const filledPhases = filledSequence.phases || [];
+    const hasPhaseCountMismatch = originalPhases.length !== filledPhases.length;
+    
+    if (hasPhaseCountMismatch) {
+      console.log(`WARNING: Phase count mismatch! Original: ${originalPhases.length}, Filled: ${filledPhases.length}`);
+    }
+    
+    // If the original structure has phases, ensure we preserve them
+    if (originalPhases.length > 0) {
+      // Calculate how many poses to distribute to each original phase
+      const allGeneratedPoses: SequencePose[] = [];
+      
+      // Collect all poses from the filled sequence
+      if (Array.isArray(filledSequence.phases)) {
+        filledSequence.phases.forEach((phase: any) => {
+          if (Array.isArray(phase.poses)) {
+            phase.poses.forEach((pose: any) => {
+              // Process each pose and add to our collection
+              // Get the database pose ID, validate it exists
+              let poseId = pose.id || pose.pose_id || "unknown";
+              
+              // If we have the database poses, verify the ID exists
+              if (poseIdMap.size > 0) {
+                // If the ID doesn't exist but we have the name, try to find the pose by name
+                if (!poseIdMap.has(poseId) && pose.name) {
+                  const poseName = pose.name.toLowerCase();
+                  // Find the first pose with a matching name
+                  const matchingPose = Array.from(poseIdMap.values()).find(
+                    (p) => p.name?.toLowerCase() === poseName
+                  );
+                  if (matchingPose) {
+                    poseId = matchingPose.id;
+                    console.log(`Mapped pose name "${pose.name}" to ID ${poseId}`);
+                  }
                 }
               }
-            }
-            
-            // Create a sequence pose
-            const sequencePose: SequencePose = {
-              id: uuidv4(),
-              // Use the validated pose ID
-              pose_id: poseId,
-              name: pose.name,
-              duration_seconds: pose.duration_seconds || 30,
-              side: pose.side || null,
-              side_option: pose.side === "left" || pose.side === "right" ? "left_right" : pose.side_option || null,
-              cues: Array.isArray(pose.cues) ? pose.cues.join(", ") : (pose.cues || ""),
-              position: phaseIndex * 100 + poseIndex + 1,
-              sanskrit_name: pose.sanskrit_name || "",
-              image_url: pose.image_url,
-              transition: pose.transition,
-              breath_cue: pose.breath_cue,
-              modifications: pose.modifications
-            };
-            
-            return sequencePose;
-          });
-        }
+              
+              // Create a sequence pose and add to our collection
+              allGeneratedPoses.push({
+                id: uuidv4(),
+                pose_id: poseId,
+                name: pose.name,
+                duration_seconds: pose.duration_seconds || 30,
+                side: pose.side || null,
+                side_option: pose.side === "left" || pose.side === "right" ? "left_right" : pose.side_option || null,
+                cues: Array.isArray(pose.cues) ? pose.cues.join(", ") : (pose.cues || ""),
+                position: 0, // Will set position later
+                sanskrit_name: pose.sanskrit_name || "",
+                image_url: pose.image_url,
+                transition: pose.transition,
+                breath_cue: pose.breath_cue || pose.breath || "",
+                modifications: Array.isArray(pose.modifications) 
+                  ? pose.modifications.join(", ") 
+                  : (pose.modifications || "")
+              });
+            });
+          }
+        });
+      }
+      
+      // Now distribute the poses to the original phases
+      sequence.phases = originalPhases.map((originalPhase: any, phaseIndex: number) => {
+        // Calculate how many poses to assign to this phase
+        // Use a distribution proportional to the original phase structure
+        const phaseRatio = 1 / originalPhases.length;
+        const poseCount = Math.max(
+          2, // Minimum 2 poses per phase
+          Math.floor(allGeneratedPoses.length * phaseRatio)
+        );
         
-        return sequencePhase;
+        // Calculate the starting index for poses in this phase
+        const startIdx = phaseIndex * poseCount;
+        // Get poses for this phase, limited by available poses
+        const endIdx = Math.min(startIdx + poseCount, allGeneratedPoses.length);
+        const phasePoses = allGeneratedPoses.slice(startIdx, endIdx).map((pose, poseIndex) => {
+          return {
+            ...pose,
+            position: phaseIndex * 100 + poseIndex + 1 // Ensure sequential position numbers
+          };
+        });
+        
+        // Create the phase with original ID and metadata
+        return {
+          id: originalPhase.id,
+          name: originalPhase.name,
+          description: originalPhase.description || "",
+          poses: phasePoses
+        };
       });
+    } else {
+      // Fallback to the generated phases if no original structure
+      // Process each phase/segment from the filled sequence
+      if (Array.isArray(filledSequence.phases)) {
+        sequence.phases = filledSequence.phases.map((phase: any, phaseIndex: number) => {
+          const sequencePhase: SequencePhase = {
+            id: uuidv4(),
+            name: phase.name,
+            description: phase.description || "",
+            poses: []
+          };
+          
+          // Map the poses in each phase
+          if (Array.isArray(phase.poses)) {
+            sequencePhase.poses = phase.poses.map((pose: any, poseIndex: number) => {
+              // Get the database pose ID, validate it exists
+              let poseId = pose.id || pose.pose_id || "unknown";
+              
+              // If we have the database poses, verify the ID exists
+              if (poseIdMap.size > 0) {
+                // If the ID doesn't exist but we have the name, try to find the pose by name
+                if (!poseIdMap.has(poseId) && pose.name) {
+                  const poseName = pose.name.toLowerCase();
+                  // Find the first pose with a matching name
+                  const matchingPose = Array.from(poseIdMap.values()).find(
+                    (p) => p.name?.toLowerCase() === poseName
+                  );
+                  if (matchingPose) {
+                    poseId = matchingPose.id;
+                    console.log(`Mapped pose name "${pose.name}" to ID ${poseId}`);
+                  }
+                }
+              }
+              
+              // Create a sequence pose
+              const sequencePose: SequencePose = {
+                id: uuidv4(),
+                // Use the validated pose ID
+                pose_id: poseId,
+                name: pose.name,
+                duration_seconds: pose.duration_seconds || 30,
+                side: pose.side || null,
+                side_option: pose.side === "left" || pose.side === "right" ? "left_right" : pose.side_option || null,
+                cues: Array.isArray(pose.cues) ? pose.cues.join(", ") : (pose.cues || ""),
+                position: phaseIndex * 100 + poseIndex + 1,
+                sanskrit_name: pose.sanskrit_name || "",
+                image_url: pose.image_url,
+                transition: pose.transition,
+                breath_cue: pose.breath_cue || pose.breath || "",
+                modifications: Array.isArray(pose.modifications) 
+                  ? pose.modifications.join(", ") 
+                  : (pose.modifications || "")
+              };
+              
+              return sequencePose;
+            });
+          }
+          
+          return sequencePhase;
+        });
+      }
     }
     
     console.log("serverSequenceService: Successfully converted to sequence format");
@@ -638,172 +737,126 @@ export const serverSequenceService = {
     return sequence;
   },
   
-  // Get yoga guidelines based on style, focus and difficulty
+  // Get yoga guidelines based on style, focus, and difficulty
   async getYogaGuidelines(style: string, focus: string, difficulty: string): Promise<string> {
+    // Get basic guidelines if available
     try {
-      // Try to get the guidelines from the markdown file
-      const fullGuidelines = await getYogaGuidelines();
+      const { getYogaGuidelines: getBasicGuidelines } = await import('@/lib/server-utils');
+      const basicGuidelines = await getBasicGuidelines();
       
-      if (!fullGuidelines) {
-        // Fall back to hard-coded guidelines if file not found
-        return this.getFallbackGuidelines(style, focus, difficulty);
+      // If we have basic guidelines from the file, use them
+      if (basicGuidelines && basicGuidelines.trim().length > 0) {
+        return basicGuidelines;
       }
-      
-      // Extract relevant sections based on parameters
-      let relevantGuidelines = '';
-      
-      // Add general principles
-      const generalSection = fullGuidelines.split('## General Sequencing Principles')[1]?.split('##')[0];
-      if (generalSection) {
-        relevantGuidelines += generalSection;
-      }
-      
-      // Add duration-specific guidelines
-      const durationSection = fullGuidelines.match(/## Duration-Based Sequencing([\s\S]*?)(?=##)/)?.[1];
-      if (durationSection) {
-        relevantGuidelines += durationSection;
-      }
-      
-      // Add style-specific guidelines
-      const styleKey = style.charAt(0).toUpperCase() + style.slice(1);
-      const styleSection = fullGuidelines.match(new RegExp(`### ${styleKey}([\\s\\S]*?)(?=###|##)`))?.[1];
-      if (styleSection) {
-        relevantGuidelines += `Style-specific guidelines:\n${styleSection}\n`;
-      }
-      
-      // Add difficulty-specific guidelines
-      const difficultyKey = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
-      const difficultySection = fullGuidelines.match(new RegExp(`### ${difficultyKey}([\\s\\S]*?)(?=###|##)`))?.[1];
-      if (difficultySection) {
-        relevantGuidelines += `Difficulty level considerations:\n${difficultySection}\n`;
-      }
-      
-      // Add focus-specific guidelines if not "full body"
-      if (focus !== "full body") {
-        // Convert focus to likely heading format
-        const focusMap: Record<string, string> = {
-          "upper body": "Hip Openers|Backbends|Inversions|Arm Balances",
-          "lower body": "Hip Openers|Forward Bends",
-          "core": "Core Strength",
-          "balance": "Balance",
-          "flexibility": "Forward Bends|Hip Openers"
-        };
-        
-        const focusPattern = focusMap[focus] || focus.replace(/ /g, ' ');
-        const focusRegex = new RegExp(`### (${focusPattern})([\\s\\S]*?)(?=###|##)`, 'i');
-        const focusSection = fullGuidelines.match(focusRegex)?.[2];
-        
-        if (focusSection) {
-          relevantGuidelines += `Focus area guidelines:\n${focusSection}\n`;
-        }
-      }
-      
-      // Clean up the extracted content
-      return relevantGuidelines
-        .replace(/^\s*[\r\n]/gm, '')  // Remove empty lines
-        .replace(/\n- /g, '\n• ')     // Convert hyphens to bullets
-        .trim();
     } catch (error) {
-      console.error("Error getting yoga guidelines from file:", error);
-      // Fall back to hard-coded guidelines
-      return this.getFallbackGuidelines(style, focus, difficulty);
-    }
-  },
-   
-  // This is the original implementation as a fallback
-  getFallbackGuidelines(style: string, focus: string, difficulty: string): string {
-    // Common principles
-    let guidelines = "• Sequence should flow naturally from one pose to the next\n";
-    guidelines += "• Balance seated, standing, and supine poses appropriately\n";
-    guidelines += "• Include counter-poses after deep or intense poses\n";
-    
-    // Style-specific guidelines
-    switch (style) {
-      case "vinyasa":
-        guidelines += "• Connect breath with movement (one breath, one movement)\n";
-        guidelines += "• Use sun salutations as linking sequences\n";
-        guidelines += "• Build momentum gradually and peak in the middle of the sequence\n";
-        break;
-        
-      case "hatha":
-        guidelines += "• Hold poses longer for deeper stretch and stability (45-90 seconds)\n";
-        guidelines += "• Focus on proper alignment and body awareness\n";
-        guidelines += "• Include plenty of time for proper adjustment in each pose\n";
-        break;
-        
-      case "yin":
-        guidelines += "• Hold poses for 2-5 minutes to target deep connective tissues\n";
-        guidelines += "• Focus on passive stretching rather than muscular engagement\n";
-        guidelines += "• Encourage use of props for support\n";
-        break;
-        
-      case "power":
-        guidelines += "• Include more dynamic and strength-building poses\n";
-        guidelines += "• Build heat through continuous movement\n";
-        guidelines += "• Add challenging variations of traditional poses\n";
-        break;
-        
-      case "restorative":
-        guidelines += "• Include extensive use of props for complete support\n";
-        guidelines += "• Hold poses for 5-10 minutes to deeply relax the body\n";
-        guidelines += "• Focus on complete surrender and comfort in poses\n";
-        break;
+      console.error("Failed to import server utils:", error);
+      // Continue with fallback guidelines
     }
     
-    // Focus area specific guidelines
-    switch (focus) {
-      case "full body":
-        guidelines += "• Include a balanced mix of standing, seated, and supine poses\n";
-        guidelines += "• Target all major muscle groups and joint movements\n";
-        break;
-        
-      case "upper body":
-        guidelines += "• Emphasize shoulder openers, arm balances, and chest expansions\n";
-        guidelines += "• Include poses that strengthen arms, shoulders, and upper back\n";
-        break;
-        
-      case "lower body":
-        guidelines += "• Focus on hip openers, hamstring stretches, and leg strengtheners\n";
-        guidelines += "• Include ankle mobility and foot stability exercises\n";
-        break;
-        
-      case "core":
-        guidelines += "• Incorporate poses that engage the deep core muscles\n";
-        guidelines += "• Balance between core strengthening and core stretching\n";
-        break;
-        
-      case "balance":
-        guidelines += "• Progress from stable to more challenging balance poses\n";
-        guidelines += "• Include preparatory poses that build required strength\n";
-        break;
-        
-      case "flexibility":
-        guidelines += "• Hold stretches longer to increase flexibility\n";
-        guidelines += "• Warm up thoroughly before deep stretches\n";
-        break;
-    }
+    // Create detailed style-specific guidelines
+    const styleGuidelines = {
+      vinyasa: `
+        - Flow smoothly from pose to pose, connecting movement with breath
+        - Each movement should be coordinated with either inhale or exhale
+        - Include sun salutations and variations as foundation for flow
+        - Build sequences that move logically from one pose to the next
+        - For ${difficulty} level, include appropriate ${difficulty === 'beginner' ? 'basic' : difficulty === 'intermediate' ? 'moderate' : 'challenging'} transitions
+        - Ensure adequate warm-up before demanding poses
+        - Focus on ${focus} while maintaining whole-body awareness
+      `,
+      hatha: `
+        - Hold poses longer (30-60 seconds) with focus on alignment
+        - Balance strength and flexibility
+        - Include both standing and seated poses
+        - For ${difficulty} level, choose ${difficulty === 'beginner' ? 'accessible' : difficulty === 'intermediate' ? 'moderate' : 'advanced'} variations
+        - Ensure adequate preparation for deeper poses
+        - Focus on ${focus} while creating a balanced practice
+        - Include mindful transitions between poses
+      `,
+      yin: `
+        - Long holds (3-5 minutes) in passive poses
+        - Target connective tissues rather than muscles
+        - Focus on relaxation and surrender
+        - Props are encouraged for support
+        - Minimal muscular engagement
+        - Include appropriate counterposes
+        - Adjust hold times based on ${difficulty} level
+        - Focus on ${focus} while respecting body's limitations
+      `,
+      power: `
+        - Emphasize strength-building elements
+        - Dynamic movements and challenging transitions
+        - Longer holds in strength-building poses
+        - Include core work throughout the practice
+        - For ${difficulty} level, include appropriate ${difficulty === 'beginner' ? 'accessible' : difficulty === 'intermediate' ? 'moderate' : 'challenging'} variations
+        - Focus on ${focus} while building overall strength
+        - Maintain energetic pace while ensuring proper alignment
+      `,
+      restorative: `
+        - Very long holds (5-10 minutes) in fully supported poses
+        - Extensive use of props for complete comfort
+        - Focus on complete relaxation and nervous system regulation
+        - Minimal transitions between poses
+        - Create sense of safety and comfort
+        - Adapt for ${difficulty} level appropriately
+        - Focus on ${focus} through gentle, supported positions
+      `
+    };
     
-    // Difficulty level adjustments
-    switch (difficulty) {
-      case "beginner":
-        guidelines += "• Avoid complex transitions between poses\n";
-        guidelines += "• Include detailed alignment cues for safety\n";
-        guidelines += "• Favor basic poses with modifications\n";
-        break;
-        
-      case "intermediate":
-        guidelines += "• Include some challenging variations of basic poses\n";
-        guidelines += "• Include more complex transitions between poses\n";
-        break;
-        
-      case "advanced":
-        guidelines += "• Include challenging pose variations and transitions\n";
-        guidelines += "• Longer holds or more dynamic movements\n";
-        guidelines += "• Create creative and unique sequences\n";
-        break;
-    }
+    // Focus-specific guidance
+    const focusGuidelines = {
+      "full body": "Create a balanced practice that addresses all major muscle groups and movement patterns.",
+      "upper body": "Include poses that open the shoulders, chest, and arms while strengthening the back and core.",
+      "lower body": "Focus on poses that strengthen and stretch the legs, hips, and glutes while maintaining stability.",
+      "core": "Incorporate poses that engage the abdominals, back, and pelvic floor throughout the practice.",
+      "balance": "Include standing balance poses, build toward more challenging variations based on level, and include preparation/counter poses.",
+      "flexibility": "Emphasize longer holds, use props as needed, and sequence logically to safely increase range of motion."
+    };
     
-    return guidelines;
+    // Difficulty-specific guidance
+    const difficultyGuidelines = {
+      beginner: `
+        - Simple, accessible poses with clear alignment cues
+        - Slower pace with adequate rest between demanding poses
+        - More detailed instructions and modifications
+        - Shorter holding times (especially for challenging poses)
+        - Focus on building foundation and body awareness
+      `,
+      intermediate: `
+        - More complex poses with refined alignment details
+        - Moderate pace with strategic sequencing
+        - Some challenging variations with modifications offered
+        - Balanced holding times suitable for practice level
+        - Focus on deepening awareness and expanding repertoire
+      `,
+      advanced: `
+        - Include challenging poses and transitions appropriate for experienced practitioners
+        - Faster pace when appropriate for the style
+        - Longer holding times for strength-building
+        - Refined subtle body awareness cues
+        - Focus on precision and advanced variations
+      `
+    };
+    
+    // Combine all guidelines
+    return `
+      ${styleGuidelines[style as keyof typeof styleGuidelines] || ''}
+      
+      FOCUS AREA (${focus}):
+      ${focusGuidelines[focus as keyof typeof focusGuidelines] || ''}
+      
+      DIFFICULTY LEVEL (${difficulty}):
+      ${difficultyGuidelines[difficulty as keyof typeof difficultyGuidelines] || ''}
+      
+      GENERAL SEQUENCING PRINCIPLES:
+      - Always begin with centering/breath awareness
+      - Warm up the body appropriately before challenging poses
+      - Progress from simple to complex movements
+      - Include counterposes after deep stretches or challenging poses
+      - Cool down gradually toward final relaxation
+      - Consider the overall arc of the practice (build up, peak, wind down)
+      - Ensure the sequence is balanced (left/right, front/back, strength/flexibility)
+    `;
   },
 
   async setAuthToken(token: string, client: any) {
