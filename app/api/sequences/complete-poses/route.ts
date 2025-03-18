@@ -76,6 +76,10 @@ export async function POST(req: NextRequest) {
           additionalNotes: structure.notes
         };
         
+        console.log(`API: Structure has ${structure.phases.length} phases with IDs:`, 
+          structure.phases.map((p: any) => p.id)
+        );
+        
         // Call the fill poses method directly
         const filledSequence = await serverSequenceService.fillSequenceWithPoses(
           structure, // The structure contains all the sequence segments already
@@ -86,6 +90,43 @@ export async function POST(req: NextRequest) {
         // Make sure to keep the same ID
         filledSequence.id = sequenceId;
         filledSequence.structureOnly = false;
+        
+        // CRITICAL FIX: Ensure all original phase IDs are preserved
+        if (structure.phases && structure.phases.length > 0) {
+          console.log(`API: BEFORE preservation - filled sequence has ${filledSequence.phases.length} phases with IDs:`, 
+            filledSequence.phases.map((p: any) => p.id)
+          );
+          
+          // If the number of phases matches, we can preserve the original IDs
+          if (structure.phases.length === filledSequence.phases.length) {
+            // Map the original phase IDs onto the filled sequence
+            filledSequence.phases = filledSequence.phases.map((phase: any, index: number) => {
+              // Keep the original phase ID but take all other properties from the filled phase
+              return {
+                ...phase,
+                id: structure.phases[index].id
+              };
+            });
+            
+            console.log(`API: AFTER preservation - filled sequence has ${filledSequence.phases.length} phases with IDs:`, 
+              filledSequence.phases.map((p: any) => p.id)
+            );
+          } else {
+            console.log(`API: Phase count mismatch! Original: ${structure.phases.length}, Filled: ${filledSequence.phases.length}`);
+            
+            // Try to match as many phases as we can
+            const minPhaseCount = Math.min(structure.phases.length, filledSequence.phases.length);
+            
+            // Preserve IDs for the phases we have
+            for (let i = 0; i < minPhaseCount; i++) {
+              filledSequence.phases[i].id = structure.phases[i].id;
+            }
+            
+            console.log(`API: After partial phase ID preservation - filled sequence has ${filledSequence.phases.length} phases with IDs:`, 
+              filledSequence.phases.map((p: any) => p.id)
+            );
+          }
+        }
         
         console.log(`API: Successfully filled sequence with poses: ${sequenceId}`)
         

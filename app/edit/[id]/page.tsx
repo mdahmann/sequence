@@ -1211,9 +1211,15 @@ export default function SequenceEditorPage() {
                   phaseIds: preservedSequence.phases.map(p => p.id),
                 });
                 
-                // Update expanded phases to match the current phase IDs
+                // CRITICAL FIX: Update expanded phases to match the latest phase IDs immediately
+                // This ensures that we capture the correct IDs right at the moment of update
                 const currentPhaseIds = preservedSequence.phases.map(phase => phase.id);
+                
+                // Force a synchronous update to expanded phases
                 setExpandedPhases(currentPhaseIds);
+                
+                // Additional verification for debugging
+                console.log(`Updated expanded phases with ${currentPhaseIds.length} phase IDs:`, currentPhaseIds);
                 
                 return preservedSequence;
               });
@@ -1246,15 +1252,6 @@ export default function SequenceEditorPage() {
     }
   }, [sequence, isPosesLoading, showToast, expandedPhases]);
   
-  // Add effect to ensure expandedPhases stay in sync with current phase IDs
-  useEffect(() => {
-    if (sequence && sequence.phases) {
-      const allPhaseIds = sequence.phases.map(phase => phase.id);
-      console.log(`Setting ALL expanded phases:`, allPhaseIds);
-      setExpandedPhases(allPhaseIds);
-    }
-  }, [sequence?.id, !sequence?.structureOnly]); // Only run when sequence ID changes or it's no longer structureOnly
-  
   // Helper function to find a pose by ID
   const findPoseById = (poseId: string): SequencePose | null => {
     if (!sequence) return null;
@@ -1266,6 +1263,49 @@ export default function SequenceEditorPage() {
     
     return null;
   };
+  
+  // Add effect to ensure expandedPhases stay in sync with current phase IDs
+  useEffect(() => {
+    if (sequence && sequence.phases) {
+      // Only run this when the sequence transitions from structureOnly to complete
+      if (sequence.structureOnly === false) {
+        const allPhaseIds = sequence.phases.map(phase => phase.id);
+        console.log(`Setting ALL expanded phases after pose generation:`, allPhaseIds);
+        setExpandedPhases(allPhaseIds);
+        
+        // Add extra debugging to verify the phase IDs
+        setTimeout(() => {
+          console.log("VERIFICATION - Current expanded phases after update:", expandedPhases);
+          console.log("VERIFICATION - Current sequence phase IDs:", sequence.phases.map(p => p.id));
+        }, 100);
+      }
+    }
+  }, [sequence?.structureOnly]); // Only run when structureOnly changes from true to false
+
+  // Also retain the existing useEffect for edge cases
+  useEffect(() => {
+    if (sequence && sequence.phases && sequence.phases.length > 0) {
+      // Get all phase IDs from the current sequence
+      const allPhaseIds = sequence.phases.map(phase => phase.id);
+      
+      // Check if we need to update expanded phases
+      const needsUpdate = (
+        // Either we don't have any expanded phases yet
+        expandedPhases.length === 0 ||
+        // Or we have the wrong number of expanded phases
+        expandedPhases.length !== allPhaseIds.length ||
+        // Or we have different phase IDs than what's in the sequence
+        !allPhaseIds.every(id => expandedPhases.includes(id))
+      );
+      
+      if (needsUpdate) {
+        console.log("Ensuring all phases are expanded:", allPhaseIds);
+        setTimeout(() => {
+          setExpandedPhases(allPhaseIds);
+        }, 100);
+      }
+    }
+  }, [sequence, expandedPhases]);
   
   // Handle pose selection from sidebar
   const handlePoseSelect = (pose: any) => {
