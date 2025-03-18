@@ -35,6 +35,7 @@ export interface SequencePose {
   name: string
   duration_seconds: number
   side?: "left" | "right" | "both" | null
+  side_option?: string | null
   cues?: string
   position: number
   sanskrit_name?: string

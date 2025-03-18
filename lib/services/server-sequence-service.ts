@@ -228,7 +228,7 @@ export const serverSequenceService = {
       2. Brief overall intention/theme
       3. 4-7 logical practice segments (avoid just "warm-up, main, cool down")
       4. For each segment include:
-         - Name (use authentic yoga terminology)
+         - Name (use simple, clear English terminology rather than Sanskrit)
          - Duration in minutes (total should equal ${params.duration})
          - Purpose/focus of this segment
          - General pose types to include (not specific poses)
@@ -242,12 +242,12 @@ export const serverSequenceService = {
     
     // Call OpenAI with function calling to get a structured response
     const completion = await openai.chat.completions.create({
-      model: "gpt-4-turbo",
+      model: "gpt-4o-mini",
       temperature: 0.7,
       messages: [
         {
           role: "system",
-          content: "You are an expert yoga teacher designing authentic, safe sequences following traditional yoga principles."
+          content: "You are an expert yoga teacher designing authentic, safe sequences following traditional yoga principles. Use simple English for phase names and section titles instead of Sanskrit. Only use Sanskrit for individual pose names when necessary."
         },
         {
           role: "user",
@@ -330,24 +330,28 @@ export const serverSequenceService = {
       3. For vinyasa, use more poses with shorter holds; for yin/restorative, use fewer poses with longer holds
       4. For each pose include:
          - name (must exactly match a name from the provided list)
+         - sanskrit_name (always include the Sanskrit name for each pose)
          - duration_seconds (how long to hold the pose)
          - side (if applicable, either "left", "right", "both", or null)
          - transition (brief instruction on how to move to this pose)
          - cues (array of alignment and breath cues)
-      5. Bilateral poses should be repeated on both sides, sequentially
-      ${params.peakPose ? `6. Include the peak pose "${params.peakPose.name}" at an appropriate point in the sequence with proper preparation and counter poses` : ''}
+      5. Bilateral poses (poses that can be done on either side) should:
+         - Be clearly marked with a side value ("left", "right", or "both")
+         - Generally be repeated on both sides sequentially in the practice
+      6. Use simple, clear English for ALL phase/segment names - DO NOT use Sanskrit terms for section titles
+      ${params.peakPose ? `7. Include the peak pose "${params.peakPose.name}" at an appropriate point in the sequence with proper preparation and counter poses` : ''}
     `;
     
     console.log("serverSequenceService: Calling OpenAI API to fill sequence with poses");
     
     // Call OpenAI with function calling to get a structured response with poses
     const completion = await openai.chat.completions.create({
-      model: "gpt-4-turbo", 
+      model: "gpt-4o-mini", 
       temperature: 0.7,
       messages: [
         {
           role: "system",
-          content: "You are an expert yoga teacher creating detailed pose sequences. Select appropriate poses for each segment of the class structure."
+          content: "You are an expert yoga teacher creating detailed pose sequences. Select appropriate poses for each segment of the class structure. Use simple English phase names rather than Sanskrit terminology for section titles. Reserve Sanskrit for pose names only."
         },
         {
           role: "user",
@@ -444,6 +448,7 @@ export const serverSequenceService = {
               name: pose.name,
               duration_seconds: pose.duration_seconds || 30,
               side: pose.side || null,
+              side_option: pose.side === "left" || pose.side === "right" ? "left_right" : pose.side_option || null,
               cues: Array.isArray(pose.cues) ? pose.cues.join(", ") : (pose.cues || ""),
               position: phaseIndex * 100 + poseIndex + 1,
               sanskrit_name: pose.sanskrit_name,

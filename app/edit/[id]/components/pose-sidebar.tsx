@@ -14,7 +14,7 @@ interface Pose {
   category: string | null
   difficulty: string | null
   difficulty_level?: string | null
-  side_option: boolean
+  side_option: string | null | boolean
   image_url?: string
 }
 
@@ -65,7 +65,9 @@ export function PoseSidebar({ onPoseSelect }: PoseSidebarProps) {
           sanskrit_name: pose.sanskrit_name,
           category: pose.category,
           difficulty: pose.difficulty_level || pose.difficulty,
-          side_option: pose.side_option === true || pose.side_option === "true",
+          side_option: pose.side_option === true || pose.side_option === "true" 
+            ? "left_right" 
+            : (pose.side_option || null),
           image_url: pose.image_url
         }))
         
@@ -102,7 +104,7 @@ export function PoseSidebar({ onPoseSelect }: PoseSidebarProps) {
           sanskrit_name: "Tadasana",
           category: "standing",
           difficulty: "beginner",
-          side_option: false,
+          side_option: null,
           image_url: "/poses/mountain.jpg"
         },
         {
@@ -111,7 +113,7 @@ export function PoseSidebar({ onPoseSelect }: PoseSidebarProps) {
           sanskrit_name: "Adho Mukha Svanasana",
           category: "arm_balance",
           difficulty: "beginner",
-          side_option: false,
+          side_option: null,
           image_url: "/poses/downdog.jpg"
         },
         {
@@ -120,7 +122,7 @@ export function PoseSidebar({ onPoseSelect }: PoseSidebarProps) {
           sanskrit_name: "Virabhadrasana I",
           category: "standing",
           difficulty: "intermediate",
-          side_option: true,
+          side_option: "left_right",
           image_url: "/poses/warrior1.jpg"
         },
         {
@@ -129,7 +131,7 @@ export function PoseSidebar({ onPoseSelect }: PoseSidebarProps) {
           sanskrit_name: "Trikonasana",
           category: "standing",
           difficulty: "intermediate",
-          side_option: true,
+          side_option: "left_right",
           image_url: "/poses/triangle.jpg"
         },
         {
@@ -138,7 +140,7 @@ export function PoseSidebar({ onPoseSelect }: PoseSidebarProps) {
           sanskrit_name: "Balasana",
           category: "seated",
           difficulty: "beginner",
-          side_option: false,
+          side_option: null,
           image_url: "/poses/child.jpg"
         },
         {
@@ -147,7 +149,7 @@ export function PoseSidebar({ onPoseSelect }: PoseSidebarProps) {
           sanskrit_name: "Bakasana",
           category: "arm_balance",
           difficulty: "advanced",
-          side_option: false,
+          side_option: null,
           image_url: "/poses/crow.jpg"
         }
       ]
@@ -401,7 +403,7 @@ export function PoseSidebar({ onPoseSelect }: PoseSidebarProps) {
                       {formatCategory(pose.difficulty)}
                     </Badge>
                   )}
-                  {pose.side_option && (
+                  {(pose.side_option === "left_right" || pose.side_option === "both") && (
                     <Badge variant="outline" className="text-xs">
                       Has sides
                     </Badge>

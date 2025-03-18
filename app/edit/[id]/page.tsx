@@ -138,9 +138,9 @@ export default function SequenceEditorPage() {
       
       setSequence(foundSequence)
       
-      // Expand the first phase by default
+      // Expand all phases by default instead of just the first one
       if (foundSequence.phases && foundSequence.phases.length > 0) {
-        setExpandedPhases([foundSequence.phases[0].id])
+        setExpandedPhases(foundSequence.phases.map((phase: SequencePhase) => phase.id))
       }
       
       setIsLoading(false)

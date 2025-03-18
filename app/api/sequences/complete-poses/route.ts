@@ -107,7 +107,8 @@ export async function POST(req: NextRequest) {
                 name: pose.english_name || pose.name,
                 sanskrit_name: pose.sanskrit_name,
                 duration_seconds: 60,
-                position: i + 1
+                position: i + 1,
+                side_option: null
               }))
             },
             {
@@ -120,7 +121,8 @@ export async function POST(req: NextRequest) {
                 name: pose.english_name || pose.name,
                 sanskrit_name: pose.sanskrit_name,
                 duration_seconds: 30,
-                position: i + 3
+                position: i + 3,
+                side_option: null
               }))
             },
             {
@@ -134,7 +136,8 @@ export async function POST(req: NextRequest) {
                 sanskrit_name: pose.sanskrit_name,
                 duration_seconds: 45,
                 position: i + 6,
-                side: i % 2 === 0 ? "left" : "right"
+                side: i % 2 === 0 ? "left" : "right",
+                side_option: "left_right"
               }))
             },
             {
@@ -160,7 +163,8 @@ export async function POST(req: NextRequest) {
                 name: pose.english_name || pose.name,
                 sanskrit_name: pose.sanskrit_name,
                 duration_seconds: 180,
-                position: i + 13
+                position: i + 13,
+                side_option: null
               }))
             }
           ],
