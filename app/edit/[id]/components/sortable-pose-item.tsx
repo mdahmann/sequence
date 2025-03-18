@@ -46,6 +46,9 @@ export function SortablePoseItem({
     transition,
   };
 
+  // Check if this pose has a side option that supports left/right
+  const hasSideOption = pose.side_option === "left_right" || pose.side_option === "both";
+
   return (
     <div
       ref={setNodeRef}
@@ -101,8 +104,8 @@ export function SortablePoseItem({
             <div>
               <div className="font-medium flex items-center">
                 {pose.name}
-                {/* Only show side toggle if the pose is a bilateral pose (has a valid side) */}
-                {pose.side && pose.side_option && (
+                {/* Only show side toggle if the pose supports sides */}
+                {hasSideOption && pose.side && (
                   <button 
                     onClick={() => onSideToggle?.(pose.id)}
                     className={cn(
