@@ -61,6 +61,12 @@ export async function POST(req: NextRequest) {
         // Process the poses
         const processedPoses = serverSequenceService.processPoses(poses);
         
+        // Organize poses by name for quick lookup
+        const posesByName = new Map();
+        processedPoses.forEach(pose => {
+          posesByName.set(pose.name.toLowerCase(), pose);
+        });
+        
         // Use the serverSequenceService to fill in the poses
         const params = {
           duration: structure.duration_minutes,
@@ -101,15 +107,17 @@ export async function POST(req: NextRequest) {
               id: "phase1",
               name: "Centering & Breath Awareness",
               description: "Begin seated to center and connect with your breath",
-              poses: poses.slice(0, 2).map((pose: any, i: number) => ({
+              poses: poses.slice(0, 2).map((pose: any, i: number) => {
+                // Ensure pose has a Sanskrit name
+                return {
                 id: `pose-${pose.id}-${i}`,
                 pose_id: pose.id,
                 name: pose.english_name || pose.name,
-                sanskrit_name: pose.sanskrit_name,
+                sanskrit_name: pose.sanskrit_name || "",
                 duration_seconds: 60,
                 position: i + 1,
                 side_option: null
-              }))
+              }})
             },
             {
               id: "phase2",
@@ -119,7 +127,7 @@ export async function POST(req: NextRequest) {
                 id: `pose-${pose.id}-${i}`,
                 pose_id: pose.id,
                 name: pose.english_name || pose.name,
-                sanskrit_name: pose.sanskrit_name,
+                sanskrit_name: pose.sanskrit_name || "",
                 duration_seconds: 30,
                 position: i + 3,
                 side_option: null
@@ -133,7 +141,7 @@ export async function POST(req: NextRequest) {
                 id: `pose-${pose.id}-${i}`,
                 pose_id: pose.id,
                 name: pose.english_name || pose.name,
-                sanskrit_name: pose.sanskrit_name,
+                sanskrit_name: pose.sanskrit_name || "",
                 duration_seconds: 45,
                 position: i + 6,
                 side: i % 2 === 0 ? "left" : "right",
@@ -148,7 +156,7 @@ export async function POST(req: NextRequest) {
                 id: `pose-${pose.id}-${i}`,
                 pose_id: pose.id,
                 name: pose.english_name || pose.name,
-                sanskrit_name: pose.sanskrit_name,
+                sanskrit_name: pose.sanskrit_name || "",
                 duration_seconds: 60,
                 position: i + 10
               }))
@@ -161,7 +169,7 @@ export async function POST(req: NextRequest) {
                 id: `pose-${pose.id}-${i}`,
                 pose_id: pose.id,
                 name: pose.english_name || pose.name,
-                sanskrit_name: pose.sanskrit_name,
+                sanskrit_name: pose.sanskrit_name || "",
                 duration_seconds: 180,
                 position: i + 13,
                 side_option: null

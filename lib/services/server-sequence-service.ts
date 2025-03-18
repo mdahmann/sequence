@@ -71,6 +71,10 @@ const filledSequenceSchema = {
               properties: {
                 name: { type: "string" },
                 description: { type: "string" },
+                sanskrit_name: { 
+                  type: "string", 
+                  description: "The Sanskrit name of the pose - this field is REQUIRED" 
+                },
                 duration_seconds: { type: "number" },
                 side: { type: "string", enum: ["left", "right", "both", null] },
                 transition: { type: "string" },
@@ -84,7 +88,7 @@ const filledSequenceSchema = {
                   items: { type: "string" }
                 }
               },
-              required: ["name", "duration_seconds"]
+              required: ["name", "sanskrit_name", "duration_seconds"]
             }
           }
         },
@@ -204,7 +208,9 @@ export const serverSequenceService = {
     return poses.map(pose => ({
       ...pose,
       // Ensure each pose has a name property that matches english_name for easier matching
-      name: pose.english_name || pose.name || 'Unknown Pose'
+      name: pose.english_name || pose.name || 'Unknown Pose',
+      // Ensure Sanskrit name is passed along
+      sanskrit_name: pose.sanskrit_name || null
     }));
   },
   
@@ -330,7 +336,7 @@ export const serverSequenceService = {
       3. For vinyasa, use more poses with shorter holds; for yin/restorative, use fewer poses with longer holds
       4. For each pose include:
          - name (must exactly match a name from the provided list)
-         - sanskrit_name (always include the Sanskrit name for each pose)
+         - sanskrit_name (CRITICAL: you MUST include the Sanskrit name for EVERY pose - this is required)
          - duration_seconds (how long to hold the pose)
          - side (if applicable, either "left", "right", "both", or null)
          - transition (brief instruction on how to move to this pose)
@@ -451,7 +457,7 @@ export const serverSequenceService = {
               side_option: pose.side === "left" || pose.side === "right" ? "left_right" : pose.side_option || null,
               cues: Array.isArray(pose.cues) ? pose.cues.join(", ") : (pose.cues || ""),
               position: phaseIndex * 100 + poseIndex + 1,
-              sanskrit_name: pose.sanskrit_name,
+              sanskrit_name: pose.sanskrit_name || "",
               image_url: pose.image_url,
               transition: pose.transition,
               breath_cue: pose.breath_cue,
