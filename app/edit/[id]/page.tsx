@@ -529,6 +529,12 @@ export default function SequenceEditorPage() {
       
       // Add save action to history
       saveToHistory(sequence, "Saved sequence")
+      
+      // Ensure all phases remain expanded
+      if (sequence.phases && sequence.phases.length > 0) {
+        const allPhaseIds = sequence.phases.map(phase => phase.id);
+        setExpandedPhases(allPhaseIds);
+      }
 
       // If we were exiting, now we can safely exit
       if (isExiting) {
@@ -1123,14 +1129,32 @@ export default function SequenceEditorPage() {
               );
               localStorage.setItem("generatedSequences", JSON.stringify(updatedSequences));
               
-              // Update state
-              setSequence(data);
+              // Ensure we have the current expanded phases state
+              const currentExpandedPhases = [...expandedPhases];
+              
+              // Update state - ensure we use a functional update to access latest state
+              setSequence((prevSequence) => {
+                // Log the phases that should be expanded
+                const allPhaseIds = data.phases.map((phase: SequencePhase) => phase.id);
+                console.log("Phases to be expanded:", allPhaseIds);
+                
+                // Set expanded phases immediately after updating sequence
+                setTimeout(() => {
+                  console.log("Setting expanded phases with timeout");
+                  setExpandedPhases(allPhaseIds);
+                }, 0);
+                
+                return data;
+              });
+              
               setIsPosesLoading(false);
               
-              // Keep all phases expanded after poses are loaded
-              if (data.phases && data.phases.length > 0) {
-                setExpandedPhases(data.phases.map((phase: SequencePhase) => phase.id));
-              }
+              // We've moved this into the setTimeout above to ensure it happens after sequence is updated
+              // if (data.phases && data.phases.length > 0) {
+              //   const allPhaseIds = data.phases.map((phase: SequencePhase) => phase.id);
+              //   console.log("Setting expanded phases after pose generation:", allPhaseIds);
+              //   setExpandedPhases(allPhaseIds);
+              // }
               
               showToast("Sequence with poses generated successfully!", "success");
             }
@@ -1149,7 +1173,7 @@ export default function SequenceEditorPage() {
       
       completePoseGeneration();
     }
-  }, [sequence, isPosesLoading, showToast]);
+  }, [sequence, isPosesLoading, showToast, expandedPhases]);
   
   // Helper function to find a pose by ID
   const findPoseById = (poseId: string): SequencePose | null => {
