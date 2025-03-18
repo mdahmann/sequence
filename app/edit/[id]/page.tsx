@@ -713,7 +713,7 @@ export default function SequenceEditorPage() {
   };
 
   // Handle side selection and add the pose
-  const handleSideSelection = (selectedSide: "left" | "right" | null) => {
+  const handleSideSelection = (selectedSide: "left" | "right" | "both" | null) => {
     if (!pendingPoseWithSideOption || !sequence) return;
     
     const { poseData, phaseId, targetPoseId } = pendingPoseWithSideOption;
@@ -721,34 +721,74 @@ export default function SequenceEditorPage() {
     // Find the phase name for history
     const targetPhase = sequence.phases.find(phase => phase.id === phaseId);
     const phaseName = targetPhase ? targetPhase.name : "phase";
-    
+
     const updatedPhases = sequence.phases.map((phase: SequencePhase) => {
       if (phase.id === phaseId) {
-        // Create the new pose with the selected side
-        const newPose = {
-          id: `${poseData.id}-${Date.now()}`,
-          pose_id: poseData.id,
-          name: poseData.name,
-          sanskrit_name: poseData.sanskrit_name || undefined,
-          duration_seconds: 30,
-          position: 0, // Will be updated below
-          side: selectedSide,
-          side_option: poseData.side_option
-        } as SequencePose;
-        
         let updatedPoses = [...phase.poses];
         
-        // If dropping at a specific pose, insert at that position
-        if (targetPoseId) {
-          const targetIndex = updatedPoses.findIndex(p => p.id === targetPoseId);
-          if (targetIndex !== -1) {
-            updatedPoses.splice(targetIndex, 0, newPose);
+        if (selectedSide === "both") {
+          // Create the left side pose first
+          const leftPose = {
+            id: `${poseData.id}-left-${Date.now()}`,
+            pose_id: poseData.id,
+            name: poseData.name,
+            sanskrit_name: poseData.sanskrit_name || undefined,
+            duration_seconds: 30,
+            position: 0, // Will be updated below
+            side: "left",
+            side_option: poseData.side_option
+          } as SequencePose;
+          
+          // Create the right side pose
+          const rightPose = {
+            id: `${poseData.id}-right-${Date.now()}`,
+            pose_id: poseData.id,
+            name: poseData.name,
+            sanskrit_name: poseData.sanskrit_name || undefined,
+            duration_seconds: 30,
+            position: 0, // Will be updated below
+            side: "right",
+            side_option: poseData.side_option
+          } as SequencePose;
+          
+          // If dropping at a specific pose, insert at that position
+          if (targetPoseId) {
+            const targetIndex = updatedPoses.findIndex(p => p.id === targetPoseId);
+            if (targetIndex !== -1) {
+              // Insert both poses at the target position
+              updatedPoses.splice(targetIndex, 0, leftPose, rightPose);
+            } else {
+              updatedPoses.push(leftPose, rightPose);
+            }
           } else {
-            updatedPoses.push(newPose);
+            // No target, add to the end
+            updatedPoses.push(leftPose, rightPose);
           }
         } else {
-          // No target, add to the end
-          updatedPoses.push(newPose);
+          // Create a single pose with the selected side (original behavior)
+          const newPose = {
+            id: `${poseData.id}-${Date.now()}`,
+            pose_id: poseData.id,
+            name: poseData.name,
+            sanskrit_name: poseData.sanskrit_name || undefined,
+            duration_seconds: 30,
+            position: 0, // Will be updated below
+            side: selectedSide,
+            side_option: poseData.side_option
+          } as SequencePose;
+          
+          // If dropping at a specific pose, insert at that position
+          if (targetPoseId) {
+            const targetIndex = updatedPoses.findIndex(p => p.id === targetPoseId);
+            if (targetIndex !== -1) {
+              updatedPoses.splice(targetIndex, 0, newPose);
+            } else {
+              updatedPoses.push(newPose);
+            }
+          } else {
+            // No target, add to the end
+            updatedPoses.push(newPose);
+          }
         }
         
         // Update positions for all poses
@@ -771,7 +811,13 @@ export default function SequenceEditorPage() {
     };
     
     setSequence(updatedSequence);
-    saveToHistory(updatedSequence, `Added "${poseData.name}" (${selectedSide || 'center'}) to ${phaseName}`);
+    
+    // Update history message based on selection
+    const historyMessage = selectedSide === "both" 
+      ? `Added "${poseData.name}" (both sides) to ${phaseName}`
+      : `Added "${poseData.name}" (${selectedSide || 'center'}) to ${phaseName}`;
+    
+    saveToHistory(updatedSequence, historyMessage);
     setPendingPoseWithSideOption(null);
   };
 
@@ -1153,6 +1199,93 @@ export default function SequenceEditorPage() {
     } as unknown as React.DragEvent<HTMLDivElement>;
     
     handleDrop(fakeEvent, phaseId);
+  };
+  
+  // Delete pose handler
+  const handleDeletePose = (poseId: string) => {
+    if (!sequence) return;
+    
+    // Find the pose to include its name in the history action
+    let poseName = "";
+    let phaseId = "";
+    
+    sequence.phases.forEach(phase => {
+      phase.poses.forEach(pose => {
+        if (pose.id === poseId) {
+          poseName = pose.name;
+          phaseId = phase.id;
+        }
+      });
+    });
+    
+    const updatedPhases = sequence.phases.map(phase => ({
+      ...phase,
+      poses: phase.poses.filter(pose => pose.id !== poseId)
+    }));
+    
+    const updatedSequence = {
+      ...sequence,
+      phases: updatedPhases
+    };
+    
+    setSequence(updatedSequence);
+    saveToHistory(updatedSequence, `Removed "${poseName}" from sequence`);
+  };
+  
+  // Duplicate pose handler
+  const handleDuplicatePose = (poseId: string) => {
+    if (!sequence) return;
+    
+    // Find the pose to duplicate
+    let poseToDuplicate: SequencePose | undefined;
+    let phaseId = "";
+    let poseIndex = -1;
+    
+    sequence.phases.forEach(phase => {
+      phase.poses.forEach((pose, index) => {
+        if (pose.id === poseId) {
+          poseToDuplicate = { ...pose };
+          phaseId = phase.id;
+          poseIndex = index;
+        }
+      });
+    });
+    
+    if (!poseToDuplicate) return;
+    
+    // Create a duplicate with a new ID
+    const duplicatedPose: SequencePose = {
+      ...poseToDuplicate,
+      id: `${poseToDuplicate.id}-${Date.now()}`, // Ensure a unique ID
+      position: poseToDuplicate.position + 1
+    };
+    
+    const updatedPhases = sequence.phases.map(phase => {
+      if (phase.id === phaseId) {
+        const updatedPoses = [...phase.poses];
+        // Insert the duplicated pose after the original
+        updatedPoses.splice(poseIndex + 1, 0, duplicatedPose);
+        
+        // Update positions
+        updatedPoses.forEach((pose, idx) => {
+          pose.position = idx + 1;
+        });
+        
+        return {
+          ...phase,
+          poses: updatedPoses
+        };
+      }
+      return phase;
+    });
+    
+    const updatedSequence = {
+      ...sequence,
+      phases: updatedPhases
+    };
+    
+    setSequence(updatedSequence);
+    saveToHistory(updatedSequence, `Duplicated "${poseToDuplicate.name}"`);
   };
   
   if (!sequenceId || isLoading) {
@@ -1697,6 +1830,8 @@ export default function SequenceEditorPage() {
                                   index={index}
                                   onDurationChange={handleDurationChange}
                                   onSideToggle={togglePoseSide}
+                                  onDelete={handleDeletePose}
+                                  onDuplicate={handleDuplicatePose}
                                 />
                               </div>
                             ))}
@@ -1716,6 +1851,8 @@ export default function SequenceEditorPage() {
                       id={activeId}
                       pose={findPoseById(activeId) || { id: '', pose_id: '', name: '', duration_seconds: 0, position: 0 }}
                       index={0}
+                      onDelete={handleDeletePose}
+                      onDuplicate={handleDuplicatePose}
                     />
                   </div>
                 )}
@@ -1901,10 +2038,10 @@ export default function SequenceEditorPage() {
             
             <div className="flex justify-center pt-2">
               <button
-                onClick={() => handleSideSelection(null)}
+                onClick={() => handleSideSelection("both")}
                 className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:underline"
               >
-                Add Centered (No Side)
+                Add Both Sides
               </button>
             </div>
           </div>
