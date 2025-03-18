@@ -5,7 +5,8 @@ import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { EnhancedSlider } from "./ui-enhanced/slider"
 import { LoadingSpinner } from "./ui-enhanced/loading-spinner"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast as useShadcnToast } from "@/components/ui/use-toast"
+import { useToast as useEnhancedToast } from "@/components/ui-enhanced/toast-provider"
 import { clientSequenceService, APIError } from "@/lib/services/client-sequence-service"
 import { Sequence, SequenceParams } from "@/types/sequence"
 import { cn } from "@/lib/utils"
@@ -33,7 +34,8 @@ const focusOptions = [
 
 export function EnhancedSequenceGenerator() {
   const router = useRouter()
-  const { toast } = useToast()
+  const { toast } = useShadcnToast()
+  const { showToast } = useEnhancedToast()
   const { supabase, isAuthenticated } = useSupabase()
   
   // Form state
@@ -141,11 +143,28 @@ export function EnhancedSequenceGenerator() {
       
       if (!isAuthenticated) {
         console.log("Client-side auth check: User is not authenticated")
-        toast({
-          title: "Authentication Required",
-          description: "Please sign in or create an account to generate sequences.",
-          variant: "destructive",
-        })
+        
+        // Use the enhanced toast with center positioning and buttons
+        showToast(
+          "Authentication Required",
+          "auth",
+          Infinity,
+          "center",
+          [
+            {
+              label: "Sign In",
+              onClick: () => {
+                router.push("/login");
+              }
+            },
+            {
+              label: "Create Account",
+              onClick: () => {
+                router.push("/signup");
+              }
+            }
+          ]
+        );
         return
       }
       
@@ -192,11 +211,27 @@ export function EnhancedSequenceGenerator() {
           localStorage.setItem("supabase.auth.token", sessionData.session.access_token)
         }
         
-        toast({
-          title: "Authentication Required",
-          description: "Please sign in or create an account to generate sequences.",
-          variant: "destructive",
-        })
+        // Use the enhanced toast with center positioning and buttons
+        showToast(
+          "Authentication Required",
+          "auth",
+          Infinity,
+          "center",
+          [
+            {
+              label: "Sign In",
+              onClick: () => {
+                router.push("/login");
+              }
+            },
+            {
+              label: "Create Account",
+              onClick: () => {
+                router.push("/signup");
+              }
+            }
+          ]
+        );
       } else {
         toast({
           title: "Error Generating Sequence",
@@ -217,6 +252,39 @@ export function EnhancedSequenceGenerator() {
     setFocus("full body")
     setAdditionalNotes("")
     setPeakPose(null)
+  }
+  
+  const handleCompletedSequence = (completedSequence: Sequence) => {
+    // Preserve original phases and just update poses
+    setGeneratedSequence(prevSequence => {
+      const updatedSequence = {...prevSequence};
+      
+      // Map the poses from completed sequence to the original phases
+      // Assuming each phase in completedSequence corresponds to original phases
+      updatedSequence.phases = prevSequence.phases.map((phase, index) => {
+        // If AI somehow reduced phases, handle that case
+        const correspondingPhase = index < completedSequence.phases.length 
+          ? completedSequence.phases[index] 
+          : null;
+          
+        if (correspondingPhase) {
+          // Preserve original phase ID and metadata, just update poses
+          return {
+            ...phase,
+            poses: correspondingPhase.poses
+          };
+        }
+        return phase;
+      });
+      
+      return updatedSequence;
+    });
+    
+    // Make sure all phases remain expanded
+    setGeneratedSequence(prevSequence => ({
+      ...prevSequence,
+      phases: prevSequence.phases.map(phase => phase.id)
+    }));
   }
   
   return (

@@ -59,6 +59,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
                 createdAt: session.user.created_at,
                 lastSignInAt: session.user.last_sign_in_at
               })
+            } else {
+              console.log("No active session after auth state change")
             }
             
             setIsAuthenticated(!!session)

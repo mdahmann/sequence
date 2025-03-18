@@ -133,13 +133,22 @@ export function EnhancedToastProvider({ children }: EnhancedToastProviderProps) 
                 toast.type === "success" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100" :
                 toast.type === "error" ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100" :
                 toast.type === "warning" ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100" :
-                toast.type === "auth" ? "bg-vibrant-blue text-white dark:bg-vibrant-blue dark:text-white" :
+                toast.type === "auth" ? "bg-vibrant-blue text-white dark:bg-vibrant-blue dark:text-white border-2 border-white/30" :
                 "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100"
               }`}
             >
               <div className="flex items-start">
                 <div className="flex-grow text-center text-lg font-medium">
-                  {toast.message}
+                  {toast.type === "auth" ? (
+                    <>
+                      <div className="text-xl font-bold mb-2">{toast.message}</div>
+                      <div className="text-sm font-normal opacity-90 mb-2">
+                        Please sign in or create an account to generate sequences.
+                      </div>
+                    </>
+                  ) : (
+                    toast.message
+                  )}
                 </div>
                 <button
                   onClick={() => hideToast(toast.id)}
@@ -158,22 +167,41 @@ export function EnhancedToastProvider({ children }: EnhancedToastProviderProps) 
               {/* Action buttons */}
               {toast.actions && toast.actions.length > 0 && (
                 <div className="mt-4 flex justify-center space-x-3">
-                  {toast.actions.map((action, index) => (
-                    <button
-                      key={index}
-                      onClick={() => {
-                        action.onClick();
-                        hideToast(toast.id);
-                      }}
-                      className={`px-4 py-2 rounded-md font-medium transition-colors ${
-                        index === 0 
-                          ? "bg-white text-vibrant-blue hover:bg-gray-100" 
-                          : "bg-transparent border border-white text-white hover:bg-white/10"
-                      }`}
-                    >
-                      {action.label}
-                    </button>
-                  ))}
+                  {toast.type === "auth" ? (
+                    toast.actions.map((action, index) => (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          action.onClick();
+                          hideToast(toast.id);
+                        }}
+                        className={`px-4 py-3 rounded-md font-medium transition-colors ${
+                          index === 0 
+                            ? "bg-white text-vibrant-blue hover:bg-gray-100 min-w-24" 
+                            : "bg-transparent border-2 border-white text-white hover:bg-white/10 min-w-24"
+                        }`}
+                      >
+                        {action.label}
+                      </button>
+                    ))
+                  ) : (
+                    toast.actions.map((action, index) => (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          action.onClick();
+                          hideToast(toast.id);
+                        }}
+                        className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                          index === 0 
+                            ? "bg-white text-vibrant-blue hover:bg-gray-100" 
+                            : "bg-transparent border border-white text-white hover:bg-white/10"
+                        }`}
+                      >
+                        {action.label}
+                      </button>
+                    ))
+                  )}
                 </div>
               )}
             </motion.div>

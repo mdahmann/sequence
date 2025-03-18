@@ -4,6 +4,7 @@ import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { cn } from "@/lib/utils"
 import { motion } from "framer-motion"
+import { Copy, Trash2 } from "lucide-react"
 
 interface SequencePose {
   id: string
@@ -23,6 +24,8 @@ interface SortablePoseItemProps {
   index: number
   onDurationChange?: (id: string, duration: number) => void
   onSideToggle?: (id: string) => void
+  onDelete?: (id: string) => void
+  onDuplicate?: (id: string) => void
 }
 
 export function SortablePoseItem({ 
@@ -30,7 +33,9 @@ export function SortablePoseItem({
   pose, 
   index, 
   onDurationChange,
-  onSideToggle
+  onSideToggle,
+  onDelete,
+  onDuplicate
 }: SortablePoseItemProps) {
   const {
     attributes,
@@ -54,7 +59,7 @@ export function SortablePoseItem({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "bg-white dark:bg-deep-charcoal-light rounded-lg shadow-sm overflow-hidden w-full",
+        "bg-white dark:bg-deep-charcoal-light rounded-lg shadow-sm overflow-hidden w-full relative group",
         isDragging ? "opacity-50 z-50 border-2 border-vibrant-blue" : "opacity-100",
         pose.side === "left" ? "border-l-4 border-l-blue-400" : "",
         pose.side === "right" ? "border-r-4 border-r-purple-400" : ""
@@ -119,37 +124,63 @@ export function SortablePoseItem({
                   </button>
                 )}
               </div>
-              {pose.sanskrit_name && (
-                <div className="text-sm text-gray-500 dark:text-gray-400 italic">
-                  {pose.sanskrit_name}
-                </div>
-              )}
+              {/* Always render the Sanskrit name container, even if it's empty to maintain consistent spacing */}
+              <div className="text-sm text-gray-500 dark:text-gray-400 italic min-h-[1.25rem]">
+                {pose.sanskrit_name || ""}
+              </div>
             </div>
           </div>
           
-          {/* Duration Selector */}
-          <div className="flex items-center space-x-3">
-            <button 
-              onClick={() => onDurationChange?.(pose.id, Math.max(5, pose.duration_seconds - 5))}
-              className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M5 10a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z" clipRule="evenodd" />
-              </svg>
-            </button>
-            
-            <div className="w-16 text-center font-medium">
-              {Math.floor(pose.duration_seconds / 60)}:{(pose.duration_seconds % 60).toString().padStart(2, '0')}
+          {/* Controls Container to hold both action buttons and duration */}
+          <div className="flex items-center gap-4">
+            {/* Duration Selector */}
+            <div className="flex items-center space-x-3">
+              <button 
+                onClick={() => onDurationChange?.(pose.id, Math.max(5, pose.duration_seconds - 5))}
+                className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M5 10a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z" clipRule="evenodd" />
+                </svg>
+              </button>
+              
+              <div className="w-16 text-center font-medium">
+                {Math.floor(pose.duration_seconds / 60)}:{(pose.duration_seconds % 60).toString().padStart(2, '0')}
+              </div>
+              
+              <button 
+                onClick={() => onDurationChange?.(pose.id, pose.duration_seconds + 5)}
+                className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+                </svg>
+              </button>
             </div>
             
-            <button 
-              onClick={() => onDurationChange?.(pose.id, pose.duration_seconds + 5)}
-              className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
-              </svg>
-            </button>
+            {/* Action Menu - moved to the right of duration controls */}
+            <div className="flex flex-col space-y-2">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete?.(pose.id);
+                }}
+                className="w-7 h-7 rounded-full bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 flex items-center justify-center text-red-600 dark:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                title="Delete pose"
+              >
+                <Trash2 size={14} />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDuplicate?.(pose.id);
+                }}
+                className="w-7 h-7 rounded-full bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 flex items-center justify-center text-blue-600 dark:text-blue-400 transition-colors opacity-0 group-hover:opacity-100"
+                title="Duplicate pose"
+              >
+                <Copy size={14} />
+              </button>
+            </div>
           </div>
         </div>
       </div>

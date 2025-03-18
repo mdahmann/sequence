@@ -63,13 +63,30 @@ export function Navbar() {
       setIsLoading(true)
       // Add a console log to track sign out
       console.log("Signing out user...")
-      await supabase.auth.signOut()
+      
+      // First clear any local state
       setUser(null)
+      
+      // Then sign out from Supabase
+      const { error } = await supabase.auth.signOut()
+      
+      if (error) {
+        console.error("Error during sign out:", error)
+        // Still redirect even if there's an error
+      }
+      
       // Force page reload to clear all auth state
       console.log("Sign out complete, redirecting...")
-      window.location.href = '/'
+      
+      // Small delay to ensure state is updated before redirect
+      setTimeout(() => {
+        // Force a hard reload to clear all client state
+        window.location.href = '/'
+      }, 100)
     } catch (error) {
       console.error("Error signing out:", error)
+      // Still redirect on error
+      window.location.href = '/'
     } finally {
       setIsLoading(false)
     }

@@ -335,8 +335,9 @@ export const serverSequenceService = {
       2. Each segment should have an appropriate number of poses based on duration and style
       3. For vinyasa, use more poses with shorter holds; for yin/restorative, use fewer poses with longer holds
       4. For each pose include:
-         - name (must exactly match a name from the provided list)
-         - sanskrit_name (CRITICAL: you MUST include the Sanskrit name for EVERY pose - this is required)
+         - id (CRITICAL: return the EXACT pose ID from the database instead of just the name)
+         - name (for reference only, must match a name from the provided list)
+         - sanskrit_name (for reference only)
          - duration_seconds (how long to hold the pose)
          - side (if applicable, either "left", "right", "both", or null)
          - transition (brief instruction on how to move to this pose)
@@ -346,6 +347,11 @@ export const serverSequenceService = {
          - Generally be repeated on both sides sequentially in the practice
       6. Use simple, clear English for ALL phase/segment names - DO NOT use Sanskrit terms for section titles
       ${params.peakPose ? `7. Include the peak pose "${params.peakPose.name}" at an appropriate point in the sequence with proper preparation and counter poses` : ''}
+      
+      CRITICAL: When you include pose information, include the exact pose ID from the database, not just the name.
+      Here is a reference list of pose IDs with their names:
+      ${poses.slice(0, 30).map(p => `ID: ${p.id} - Name: ${p.name} (${p.sanskrit_name || 'No Sanskrit name'})`).join("\n")}
+      ... (plus additional poses not shown for brevity)
     `;
     
     console.log("serverSequenceService: Calling OpenAI API to fill sequence with poses");
@@ -380,7 +386,7 @@ export const serverSequenceService = {
       console.log("serverSequenceService: Successfully filled sequence with poses");
       
       // Convert to our Sequence format
-      const result = this.convertToSequenceFormat(filledSequence, structure, params);
+      const result = this.convertToSequenceFormat(filledSequence, structure, params, poses);
       
       // Cache the result to prevent duplicate API calls
       if (!global.__sequence_cache) {
@@ -414,9 +420,18 @@ export const serverSequenceService = {
   convertToSequenceFormat(
     filledSequence: any, 
     structure: SequenceStructure, 
-    params: SequenceParams
+    params: SequenceParams,
+    poses: any[] = []
   ): Sequence {
     const now = new Date().toISOString();
+    
+    // Create lookup map for pose validation
+    const poseIdMap = new Map();
+    if (poses.length > 0) {
+      poses.forEach(pose => {
+        poseIdMap.set(pose.id, pose);
+      });
+    }
     
     // Create the sequence object
     const sequence: Sequence = {
@@ -447,10 +462,30 @@ export const serverSequenceService = {
         // Map the poses in each phase
         if (Array.isArray(phase.poses)) {
           sequencePhase.poses = phase.poses.map((pose: any, poseIndex: number) => {
+            // Get the database pose ID, validate it exists
+            let poseId = pose.id || pose.pose_id || "unknown";
+            
+            // If we have the database poses, verify the ID exists
+            if (poseIdMap.size > 0) {
+              // If the ID doesn't exist but we have the name, try to find the pose by name
+              if (!poseIdMap.has(poseId) && pose.name) {
+                const poseName = pose.name.toLowerCase();
+                // Find the first pose with a matching name
+                const matchingPose = Array.from(poseIdMap.values()).find(
+                  (p) => p.name?.toLowerCase() === poseName
+                );
+                if (matchingPose) {
+                  poseId = matchingPose.id;
+                  console.log(`Mapped pose name "${pose.name}" to ID ${poseId}`);
+                }
+              }
+            }
+            
             // Create a sequence pose
             const sequencePose: SequencePose = {
               id: uuidv4(),
-              pose_id: pose.id || "unknown", // This will be resolved later
+              // Use the validated pose ID
+              pose_id: poseId,
               name: pose.name,
               duration_seconds: pose.duration_seconds || 30,
               side: pose.side || null,

@@ -1136,17 +1136,63 @@ export default function SequenceEditorPage() {
               
               // Update state - ensure we use a functional update to access latest state
               setSequence((prevSequence) => {
+                if (!prevSequence) return data;
+                
                 // Extract ALL phase IDs from the completed sequence
                 if (!data.phases || !Array.isArray(data.phases)) {
                   console.error("Invalid phases data:", data.phases);
                   return data;
                 }
                 
-                const allPhaseIds = data.phases.map((phase: SequencePhase) => phase.id);
-                console.log("Complete sequence data structure:", JSON.stringify({
-                  id: data.id,
-                  name: data.name,
-                  phaseCount: data.phases.length,
+                // PRESERVE ORIGINAL PHASE STRUCTURE
+                // Instead of replacing the sequence with the AI response,
+                // map the AI-generated poses to the original phase structure
+                
+                // First, create a map of all poses from the AI response
+                const allGeneratedPoses = data.phases.flatMap((phase: SequencePhase) => phase.poses || []);
+                
+                // Create an updated version of the original sequence structure
+                const preservedSequence = {
+                  ...prevSequence,
+                  // Keep most properties from the original
+                  name: data.name || prevSequence.name,
+                  description: data.description || prevSequence.description,
+                  structureOnly: false, // Mark as completed
+                  // Preserve the original phases but fill with generated poses
+                  phases: prevSequence.phases.map((originalPhase, phaseIndex) => {
+                    // Calculate how many poses to assign to this phase
+                    // Use a distribution proportional to the original phase structure
+                    const phaseRatio = 1 / prevSequence.phases.length;
+                    const poseCount = Math.max(
+                      2, // Minimum 2 poses per phase
+                      Math.floor(allGeneratedPoses.length * phaseRatio)
+                    );
+                    
+                    // Calculate the starting index for poses in this phase
+                    const startIdx = phaseIndex * poseCount;
+                    // Get poses for this phase, limited by available poses
+                    const phasePoses = allGeneratedPoses.slice(
+                      startIdx,
+                      startIdx + poseCount
+                    );
+                    
+                    // Preserve the original phase ID and metadata
+                    return {
+                      ...originalPhase,
+                      poses: phasePoses.map((pose: SequencePose, poseIdx: number) => ({
+                        ...pose,
+                        position: poseIdx + 1, // Ensure positions are sequential
+                      }))
+                    };
+                  })
+                };
+                
+                // Store all original phase IDs for expansion
+                const allPhaseIds = preservedSequence.phases.map(phase => phase.id);
+                console.log("Complete sequence with PRESERVED phase structure:", JSON.stringify({
+                  id: preservedSequence.id,
+                  name: preservedSequence.name,
+                  phaseCount: preservedSequence.phases.length,
                   phaseIds: allPhaseIds
                 }));
                 
@@ -1154,7 +1200,7 @@ export default function SequenceEditorPage() {
                 setTimeout(() => {
                   console.log("Setting ALL expanded phases:", allPhaseIds);
                   // Force override with all phase IDs
-                  setExpandedPhases([...allPhaseIds]);
+                  setExpandedPhases(allPhaseIds);
                   
                   // Double-check the state was updated after a short delay
                   setTimeout(() => {
@@ -1162,7 +1208,7 @@ export default function SequenceEditorPage() {
                   }, 100);
                 }, 10);
                 
-                return data;
+                return preservedSequence;
               });
               
               setIsPosesLoading(false);
@@ -1205,18 +1251,27 @@ export default function SequenceEditorPage() {
     return null;
   };
   
-  // Add a dedicated useEffect to ensure phases remain expanded when the sequence changes
+  // Effect to ensure all phases remain expanded after any sequence updates
   useEffect(() => {
     if (sequence && sequence.phases && sequence.phases.length > 0) {
+      // Get all phase IDs from the current sequence
       const allPhaseIds = sequence.phases.map(phase => phase.id);
       
-      // Check if the current expandedPhases contains all phase IDs
-      const allPhasesExpanded = allPhaseIds.every(id => expandedPhases.includes(id));
+      // Check if we need to update expanded phases
+      const needsUpdate = (
+        // Either we don't have any expanded phases yet
+        expandedPhases.length === 0 ||
+        // Or we have the wrong number of expanded phases
+        expandedPhases.length !== allPhaseIds.length ||
+        // Or we have different phase IDs than what's in the sequence
+        !allPhaseIds.every(id => expandedPhases.includes(id))
+      );
       
-      // If not all phases are expanded, update them
-      if (!allPhasesExpanded) {
+      if (needsUpdate) {
         console.log("Ensuring all phases are expanded:", allPhaseIds);
-        setExpandedPhases(allPhaseIds);
+        setTimeout(() => {
+          setExpandedPhases(allPhaseIds);
+        }, 100);
       }
     }
   }, [sequence, expandedPhases]);
