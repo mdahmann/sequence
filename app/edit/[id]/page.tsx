@@ -105,6 +105,13 @@ export default function SequenceEditorPage() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activePhaseId, setActivePhaseId] = useState<string | null>(null);
   
+  // Add state for side selection modal
+  const [pendingPoseWithSideOption, setPendingPoseWithSideOption] = useState<{
+    poseData: PoseData;
+    phaseId: string;
+    targetPoseId?: string;
+  } | null>(null);
+  
   // Fetch sequence data from localStorage (beta approach)
   useEffect(() => {
     if (!sequenceId) {
@@ -705,7 +712,70 @@ export default function SequenceEditorPage() {
     }
   };
 
-  // Add back the handleDrop function
+  // Handle side selection and add the pose
+  const handleSideSelection = (selectedSide: "left" | "right" | null) => {
+    if (!pendingPoseWithSideOption || !sequence) return;
+    
+    const { poseData, phaseId, targetPoseId } = pendingPoseWithSideOption;
+    
+    // Find the phase name for history
+    const targetPhase = sequence.phases.find(phase => phase.id === phaseId);
+    const phaseName = targetPhase ? targetPhase.name : "phase";
+    
+    const updatedPhases = sequence.phases.map((phase: SequencePhase) => {
+      if (phase.id === phaseId) {
+        // Create the new pose with the selected side
+        const newPose = {
+          id: `${poseData.id}-${Date.now()}`,
+          pose_id: poseData.id,
+          name: poseData.name,
+          sanskrit_name: poseData.sanskrit_name || undefined,
+          duration_seconds: 30,
+          position: 0, // Will be updated below
+          side: selectedSide,
+          side_option: poseData.side_option
+        } as SequencePose;
+        
+        let updatedPoses = [...phase.poses];
+        
+        // If dropping at a specific pose, insert at that position
+        if (targetPoseId) {
+          const targetIndex = updatedPoses.findIndex(p => p.id === targetPoseId);
+          if (targetIndex !== -1) {
+            updatedPoses.splice(targetIndex, 0, newPose);
+          } else {
+            updatedPoses.push(newPose);
+          }
+        } else {
+          // No target, add to the end
+          updatedPoses.push(newPose);
+        }
+        
+        // Update positions for all poses
+        updatedPoses = updatedPoses.map((pose, index) => ({
+          ...pose,
+          position: index + 1
+        }));
+        
+        return {
+          ...phase,
+          poses: updatedPoses
+        };
+      }
+      return phase;
+    });
+
+    const updatedSequence = {
+      ...sequence,
+      phases: updatedPhases
+    };
+    
+    setSequence(updatedSequence);
+    saveToHistory(updatedSequence, `Added "${poseData.name}" (${selectedSide || 'center'}) to ${phaseName}`);
+    setPendingPoseWithSideOption(null);
+  };
+
+  // Update handleDrop to check for side options
   const handleDrop = (e: React.DragEvent<HTMLDivElement>, phaseId: string, targetPoseId?: string) => {
     e.preventDefault();
     e.stopPropagation();
@@ -715,29 +785,35 @@ export default function SequenceEditorPage() {
       const poseData = JSON.parse(e.dataTransfer.getData("pose")) as PoseData;
       if (!sequence) return;
       
-      // Find the phase name
+      // If pose has side options, show the selection dialog
+      if (poseData.side_option === "left_right" || poseData.side_option === "both") {
+        setPendingPoseWithSideOption({
+          poseData,
+          phaseId,
+          targetPoseId
+        });
+        return;
+      }
+      
+      // Original behavior for poses without side options
       const targetPhase = sequence.phases.find(phase => phase.id === phaseId);
       const phaseName = targetPhase ? targetPhase.name : "phase";
 
       const updatedPhases = sequence.phases.map((phase: SequencePhase) => {
         if (phase.id === phaseId) {
-          // Cast to SequencePose to allow adding side_option
           const newPose = {
             id: `${poseData.id}-${Date.now()}`,
             pose_id: poseData.id,
             name: poseData.name,
             sanskrit_name: poseData.sanskrit_name || undefined,
             duration_seconds: 30,
-            position: 0, // Will be updated below
-            // Only set side if the pose has a valid side option
-            side: poseData.side_option === "left_right" || poseData.side_option === "both" ? "left" : null,
-            // Store the original side_option for later reference
+            position: 0,
+            side: null,
             side_option: poseData.side_option
           } as SequencePose;
           
           let updatedPoses = [...phase.poses];
           
-          // If dropping at a specific pose, insert at that position
           if (targetPoseId) {
             const targetIndex = updatedPoses.findIndex(p => p.id === targetPoseId);
             if (targetIndex !== -1) {
@@ -746,11 +822,9 @@ export default function SequenceEditorPage() {
               updatedPoses.push(newPose);
             }
           } else {
-            // No target, add to the end
             updatedPoses.push(newPose);
           }
           
-          // Update positions for all poses
           updatedPoses = updatedPoses.map((pose, index) => ({
             ...pose,
             position: index + 1
@@ -770,7 +844,7 @@ export default function SequenceEditorPage() {
       };
       
       setSequence(updatedSequence);
-      saveToHistory(updatedSequence, `Dropped "${poseData.name}" into ${phaseName}`);
+      saveToHistory(updatedSequence, `Added "${poseData.name}" to ${phaseName}`);
     } catch (error) {
       console.error("Error handling pose drop:", error);
     }
@@ -1058,11 +1132,18 @@ export default function SequenceEditorPage() {
     };
     
     const selectedPhase = sequence.phases[selectedPhaseIndex];
-    
-    // Use handleDrop with the selected phase ID
     const phaseId = selectedPhase.id;
     
-    // Create a fake drag event
+    // If pose has side options, show the selection dialog
+    if (poseData.side_option === "left_right" || poseData.side_option === "both") {
+      setPendingPoseWithSideOption({
+        poseData,
+        phaseId
+      });
+      return;
+    }
+    
+    // Create a fake drag event for poses without side options
     const fakeEvent = {
       preventDefault: () => {},
       stopPropagation: () => {},
@@ -1761,6 +1842,69 @@ export default function SequenceEditorPage() {
                 className="px-4 py-2 bg-vibrant-blue text-white rounded-md hover:bg-vibrant-blue/90 transition-colors"
               >
                 Discard Future
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Side Selection Dialog */}
+      {pendingPoseWithSideOption && (
+        <div 
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+        >
+          <div 
+            className="bg-white dark:bg-deep-charcoal-light p-6 rounded-lg shadow-xl max-w-md w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Select Side for {pendingPoseWithSideOption.poseData.name}</h3>
+              <button 
+                onClick={() => setPendingPoseWithSideOption(null)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+            
+            <p className="text-gray-600 dark:text-gray-400 mb-5">
+              This pose can be practiced on the left or right side. Which side would you like to add?
+            </p>
+            
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <button
+                onClick={() => handleSideSelection("left")}
+                className="flex flex-col items-center p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
+              >
+                <div className="flex items-center justify-center w-12 h-12 mb-2 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                  </svg>
+                </div>
+                <span className="font-medium">Left Side</span>
+              </button>
+              
+              <button
+                onClick={() => handleSideSelection("right")}
+                className="flex flex-col items-center p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:border-purple-300 dark:hover:border-purple-700 transition-colors"
+              >
+                <div className="flex items-center justify-center w-12 h-12 mb-2 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
+                </div>
+                <span className="font-medium">Right Side</span>
+              </button>
+            </div>
+            
+            <div className="flex justify-center pt-2">
+              <button
+                onClick={() => handleSideSelection(null)}
+                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:underline"
+              >
+                Add Centered (No Side)
               </button>
             </div>
           </div>
