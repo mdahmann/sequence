@@ -1,0 +1,2 @@
+// This file exists only to ensure the pages directory is tracked by git.
+// Next.js still expects the pages directory to exist even when using the App Router. 
