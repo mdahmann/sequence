@@ -5,6 +5,7 @@ import { CSS } from "@dnd-kit/utilities"
 import { cn } from "@/lib/utils"
 import { motion } from "framer-motion"
 import { Copy, Trash2 } from "lucide-react"
+import { getPoseDisplayName, getPoseSanskritName } from "./utils"
 
 interface SequencePose {
   id: string
@@ -108,7 +109,7 @@ export function SortablePoseItem({
             )}
             <div>
               <div className="font-medium flex items-center">
-                {pose.name}
+                {getPoseDisplayName(pose)}
                 {/* Only show side toggle if the pose supports sides */}
                 {hasSideOption && pose.side && (
                   <button 
@@ -126,7 +127,7 @@ export function SortablePoseItem({
               </div>
               {/* Always render the Sanskrit name container, even if it's empty to maintain consistent spacing */}
               <div className="text-sm text-gray-500 dark:text-gray-400 italic min-h-[1.25rem]">
-                {pose.sanskrit_name || ""}
+                {getPoseSanskritName(pose)}
               </div>
             </div>
           </div>

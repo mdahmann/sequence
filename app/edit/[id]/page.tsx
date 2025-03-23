@@ -39,6 +39,7 @@ interface PoseData {
   category: string | null
   difficulty: string | null
   side_option: string | null
+  english_name?: string
 }
 
 export default function SequenceEditorPage() {
@@ -790,7 +791,7 @@ export default function SequenceEditorPage() {
           const leftPose = {
             id: `${poseData.id}-left-${Date.now()}`,
             pose_id: poseData.id,
-            name: poseData.name,
+            name: poseData.name || poseData.english_name || "Unknown Pose",
             sanskrit_name: poseData.sanskrit_name || undefined,
             duration_seconds: 30,
             position: 0, // Will be updated below
@@ -802,7 +803,7 @@ export default function SequenceEditorPage() {
           const rightPose = {
             id: `${poseData.id}-right-${Date.now()}`,
             pose_id: poseData.id,
-            name: poseData.name,
+            name: poseData.name || poseData.english_name || "Unknown Pose",
             sanskrit_name: poseData.sanskrit_name || undefined,
             duration_seconds: 30,
             position: 0, // Will be updated below
@@ -828,7 +829,7 @@ export default function SequenceEditorPage() {
           const newPose = {
             id: `${poseData.id}-${Date.now()}`,
             pose_id: poseData.id,
-            name: poseData.name,
+            name: poseData.name || poseData.english_name || "Unknown Pose",
             sanskrit_name: poseData.sanskrit_name || undefined,
             duration_seconds: 30,
             position: 0, // Will be updated below
@@ -909,7 +910,7 @@ export default function SequenceEditorPage() {
           const newPose = {
             id: `${poseData.id}-${Date.now()}`,
             pose_id: poseData.id,
-            name: poseData.name,
+            name: poseData.name || poseData.english_name || "Unknown Pose",
             sanskrit_name: poseData.sanskrit_name || undefined,
             duration_seconds: 30,
             position: 0,
@@ -1383,8 +1384,8 @@ export default function SequenceEditorPage() {
     // Convert the incoming Pose to a PoseData format if needed
     const poseData: PoseData = {
       id: pose.id,
-      name: pose.name,
-      sanskrit_name: pose.sanskrit_name || pose.sanskrit_name || null,
+      name: pose.name || pose.english_name || "Unknown Pose",
+      sanskrit_name: pose.sanskrit_name || null,
       category: pose.category || null,
       difficulty: pose.difficulty || null,
       side_option: pose.side_option || null

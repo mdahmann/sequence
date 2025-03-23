@@ -83,9 +83,9 @@ const HandDrawnSpiral: React.FC<HandDrawnSpiralProps> = ({
         style={animationStyles}
       />
       {/* Add some small irregularities to make it look hand-drawn */}
-      <path d="M13.5,3.2 C13.7,3.0 13.9,2.8 14.1,2.6" style={detailAnimationStyles} />
+      {/* <path d="M13.5,3.2 C13.7,3.0 13.9,2.8 14.1,2.6" style={detailAnimationStyles} />
       <path d="M17.8,10.5 C18.0,10.3 18.2,10.1 18.4,9.9" style={detailAnimationStyles} />
-      <path d="M8.2,14.5 C8.0,14.7 7.8,14.9 7.6,15.1" style={detailAnimationStyles} />
+      <path d="M8.2,14.5 C8.0,14.7 7.8,14.9 7.6,15.1" style={detailAnimationStyles} /> */}
     </svg>
   )
 }
