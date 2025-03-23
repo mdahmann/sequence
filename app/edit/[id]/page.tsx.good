@@ -39,7 +39,6 @@ interface PoseData {
   category: string | null
   difficulty: string | null
   side_option: string | null
-  english_name?: string
 }
 
 export default function SequenceEditorPage() {
@@ -113,43 +112,6 @@ export default function SequenceEditorPage() {
     targetPoseId?: string;
   } | null>(null);
   
-  // Helper function to ensure all phases are expanded
-  const ensureAllPhasesExpanded = (phaseIds?: string[]) => {
-    if (!sequence) return;
-    
-    // Use provided phaseIds or get them from the sequence
-    const idsToExpand = phaseIds || sequence.phases.map(phase => phase.id);
-    
-    console.log(`Ensuring all ${idsToExpand.length} phases are expanded:`, idsToExpand);
-    
-    // Set the expanded phases
-    setExpandedPhases(idsToExpand);
-    
-    // Also store in sessionStorage
-    try {
-      sessionStorage.setItem(`expandedPhases-${sequence.id}`, JSON.stringify(idsToExpand));
-    } catch (e) {
-      console.error("Failed to save to sessionStorage:", e);
-    }
-  };
-  
-  // Ensure phases stay expanded after any sequence updates
-  useEffect(() => {
-    if (sequence && !isLoading) {
-      ensureAllPhasesExpanded();
-    }
-  }, [sequence?.id, isLoading]);
-  
-  // Make sure phases are expanded when loading completes
-  useEffect(() => {
-    if (sequence && !isLoading && !isPosesLoading) {
-      // Extra safeguard to ensure phases are expanded after loading
-      setTimeout(() => {
-        ensureAllPhasesExpanded();
-      }, 100);
-    }
-  }, [isLoading, isPosesLoading]);
-  
   // Fetch sequence data from localStorage (beta approach)
   useEffect(() => {
     if (!sequenceId) {
@@ -158,18 +120,6 @@ export default function SequenceEditorPage() {
     }
 
     try {
-      // First, check if we have expandedPhases in sessionStorage
-      try {
-        const storedPhases = sessionStorage.getItem(`expandedPhases-${sequenceId}`);
-        if (storedPhases) {
-          const phaseIds = JSON.parse(storedPhases);
-          console.log("Retrieved expanded phases from sessionStorage:", phaseIds);
-          setExpandedPhases(phaseIds);
-        }
-      } catch (e) {
-        console.error("Failed to retrieve from sessionStorage:", e);
-      }
-
       const sequencesJson = localStorage.getItem("generatedSequences")
       if (!sequencesJson) {
         // If no sequences found, redirect to home
@@ -580,8 +530,11 @@ export default function SequenceEditorPage() {
       // Add save action to history
       saveToHistory(sequence, "Saved sequence")
       
-      // Ensure all phases remain expanded using the helper
-      ensureAllPhasesExpanded();
+      // Ensure all phases remain expanded
+      if (sequence.phases && sequence.phases.length > 0) {
+        const allPhaseIds = sequence.phases.map(phase => phase.id);
+        setExpandedPhases(allPhaseIds);
+      }
 
       // If we were exiting, now we can safely exit
       if (isExiting) {
@@ -593,19 +546,12 @@ export default function SequenceEditorPage() {
     }
   }
   
-  // Replace the standard togglePhaseExpansion function with one that forces phases to stay expanded
   const togglePhaseExpansion = (phaseId: string) => {
-    // If we try to collapse a phase, ignore it and instead ensure ALL phases are expanded
-    if (expandedPhases.includes(phaseId)) {
-      console.log("Attempted to collapse a phase, but we're keeping all phases expanded");
-      // Keep all phases expanded for consistent behavior
-      if (sequence) {
-        ensureAllPhasesExpanded();
-      }
-    } else {
-      // If we're expanding a phase that wasn't expanded, add it to expanded phases
-      setExpandedPhases(prev => [...prev, phaseId]);
-    }
+    setExpandedPhases(prev => 
+      prev.includes(phaseId) 
+        ? prev.filter(id => id !== phaseId)
+        : [...prev, phaseId]
+    )
   }
 
   // Legacy versions for standard HTML drag events
@@ -791,7 +737,7 @@ export default function SequenceEditorPage() {
           const leftPose = {
             id: `${poseData.id}-left-${Date.now()}`,
             pose_id: poseData.id,
-            name: poseData.name || poseData.english_name || "Unknown Pose",
+            name: poseData.name,
             sanskrit_name: poseData.sanskrit_name || undefined,
             duration_seconds: 30,
             position: 0, // Will be updated below
@@ -803,7 +749,7 @@ export default function SequenceEditorPage() {
           const rightPose = {
             id: `${poseData.id}-right-${Date.now()}`,
             pose_id: poseData.id,
-            name: poseData.name || poseData.english_name || "Unknown Pose",
+            name: poseData.name,
             sanskrit_name: poseData.sanskrit_name || undefined,
             duration_seconds: 30,
             position: 0, // Will be updated below
@@ -829,7 +775,7 @@ export default function SequenceEditorPage() {
           const newPose = {
             id: `${poseData.id}-${Date.now()}`,
             pose_id: poseData.id,
-            name: poseData.name || poseData.english_name || "Unknown Pose",
+            name: poseData.name,
             sanskrit_name: poseData.sanskrit_name || undefined,
             duration_seconds: 30,
             position: 0, // Will be updated below
@@ -910,7 +856,7 @@ export default function SequenceEditorPage() {
           const newPose = {
             id: `${poseData.id}-${Date.now()}`,
             pose_id: poseData.id,
-            name: poseData.name || poseData.english_name || "Unknown Pose",
+            name: poseData.name,
             sanskrit_name: poseData.sanskrit_name || undefined,
             duration_seconds: 30,
             position: 0,
@@ -1070,10 +1016,13 @@ export default function SequenceEditorPage() {
             if (localSequence) {
               console.log(`Client: Found sequence in localStorage: ${sequenceId}`);
               
-              // ALWAYS expand all phases when displaying sequences
-              // Store the phase IDs in a variable to ensure consistency
-              const allPhaseIds = localSequence.phases?.map((phase: any) => phase.id) || [];
-              console.log("Initial phases to expand:", allPhaseIds);
+              // Always expand all phases when displaying sequences
+              let phasesToExpand: string[] = [];
+              if (localSequence.phases && localSequence.phases.length > 0) {
+                // Make sure we get ALL phases, not just the first one
+                phasesToExpand = localSequence.phases.map((phase: any) => phase.id);
+                console.log("Initial phases to expand:", phasesToExpand);
+              }
               
               // Check if sequence has poses or just structure
               const isStructureOnly = localSequence.structureOnly === true;
@@ -1084,25 +1033,16 @@ export default function SequenceEditorPage() {
                 setSequence(localSequence);
                 setStructureLoaded(true);
                 setIsPosesLoading(true);
+                setExpandedPhases(phasesToExpand); // Expand all phases
               } else {
                 // Full sequence with poses
                 console.log(`Client: Found complete sequence with poses`);
                 setSequence(localSequence);
                 setIsPosesLoading(false);
+                
+                // Expand all phases for complete sequences too
+                setExpandedPhases(phasesToExpand);
               }
-              
-              // Immediately set the expandedPhases after setting the sequence
-              setExpandedPhases(allPhaseIds);
-              
-              // Double-check the expanded phases after a short delay to ensure they're set correctly
-              setTimeout(() => {
-                if (localSequence.phases && localSequence.phases.length > 0) {
-                  // Force expand all phases again to make sure
-                  const phaseIds = localSequence.phases.map((phase: any) => phase.id);
-                  console.log("Forcing expansion of ALL phases:", phaseIds);
-                  setExpandedPhases(phaseIds);
-                }
-              }, 100);
               
               setIsLoading(false);
               return;
@@ -1263,37 +1203,26 @@ export default function SequenceEditorPage() {
                   })
                 };
                 
-                // Extract just the phase IDs for logging
-                console.log(`Complete sequence with PRESERVED phase structure:`, {
-                  id: preservedSequence.id, 
+                // Store all original phase IDs for expansion
+                const allPhaseIds = preservedSequence.phases.map(phase => phase.id);
+                console.log("Complete sequence with PRESERVED phase structure:", JSON.stringify({
+                  id: preservedSequence.id,
                   name: preservedSequence.name,
                   phaseCount: preservedSequence.phases.length,
-                  phaseIds: preservedSequence.phases.map(p => p.id),
-                });
+                  phaseIds: allPhaseIds
+                }));
                 
-                // CRITICAL FIX: Update expanded phases to match the latest phase IDs immediately
-                // This ensures that we capture the correct IDs right at the moment of update
-                const currentPhaseIds = preservedSequence.phases.map(phase => phase.id);
-                
-                // Force a synchronous update to expanded phases
-                setExpandedPhases(currentPhaseIds);
-                
-                // Additional verification for debugging
-                console.log(`Updated expanded phases with ${currentPhaseIds.length} phase IDs:`, currentPhaseIds);
-                
-                // Also store in sessionStorage for resilience
-                try {
-                  sessionStorage.setItem(`expandedPhases-${preservedSequence.id}`, JSON.stringify(currentPhaseIds));
-                  console.log("Saved expanded phases to sessionStorage");
-                } catch (e) {
-                  console.error("Failed to save to sessionStorage:", e);
-                }
-                
-                // Schedule another update after a delay to ensure it sticks
+                // Schedule expanded phases update after render
                 setTimeout(() => {
-                  console.log("Re-verifying expanded phases are set correctly");
-                  setExpandedPhases(currentPhaseIds);
-                }, 500);
+                  console.log("Setting ALL expanded phases:", allPhaseIds);
+                  // Force override with all phase IDs
+                  setExpandedPhases(allPhaseIds);
+                  
+                  // Double-check the state was updated after a short delay
+                  setTimeout(() => {
+                    console.log("Current expanded phases after update:", expandedPhases);
+                  }, 100);
+                }, 10);
                 
                 return preservedSequence;
               });
@@ -1338,15 +1267,11 @@ export default function SequenceEditorPage() {
     return null;
   };
   
-  // Add effect to ensure expandedPhases stay in sync with current phase IDs
+  // Effect to ensure all phases remain expanded after any sequence updates
   useEffect(() => {
     if (sequence && sequence.phases && sequence.phases.length > 0) {
       // Get all phase IDs from the current sequence
       const allPhaseIds = sequence.phases.map(phase => phase.id);
-      
-      // Always log the current state for debugging
-      console.log("Current expanded phases:", expandedPhases);
-      console.log("Sequence contains phases:", allPhaseIds);
       
       // Check if we need to update expanded phases
       const needsUpdate = (
@@ -1360,19 +1285,9 @@ export default function SequenceEditorPage() {
       
       if (needsUpdate) {
         console.log("Ensuring all phases are expanded:", allPhaseIds);
-        // Use a key-based force update approach
-        const forceUpdateKey = Date.now();
-        
-        // Force override all phase IDs - don't wait for a timeout
-        setExpandedPhases(allPhaseIds);
-        
-        // Also store in sessionStorage as a safety mechanism
-        try {
-          sessionStorage.setItem(`expandedPhases-${sequence.id}`, JSON.stringify(allPhaseIds));
-          console.log("Saved expanded phases to sessionStorage");
-        } catch (e) {
-          console.error("Failed to save to sessionStorage:", e);
-        }
+        setTimeout(() => {
+          setExpandedPhases(allPhaseIds);
+        }, 100);
       }
     }
   }, [sequence, expandedPhases]);
@@ -1384,8 +1299,8 @@ export default function SequenceEditorPage() {
     // Convert the incoming Pose to a PoseData format if needed
     const poseData: PoseData = {
       id: pose.id,
-      name: pose.name || pose.english_name || "Unknown Pose",
-      sanskrit_name: pose.sanskrit_name || null,
+      name: pose.name,
+      sanskrit_name: pose.sanskrit_name || pose.sanskrit_name || null,
       category: pose.category || null,
       difficulty: pose.difficulty || null,
       side_option: pose.side_option || null
