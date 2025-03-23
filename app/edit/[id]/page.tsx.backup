@@ -1,0 +1,1278 @@
+"use client"
+
+import { useEffect, useState, useRef } from "react"
+import { useParams, useRouter, notFound } from "next/navigation"
+import { motion, AnimatePresence } from "framer-motion"
+import { LoadingSpinner } from "@/components/ui-enhanced/loading-spinner"
+import { useToast } from "@/components/ui-enhanced/toast-provider"
+import { Sequence, SequencePhase, SequencePose } from "@/types/sequence"
+import { cn } from "@/lib/utils"
+import { Skeleton, PoseSkeleton } from "@/components/ui-enhanced/skeleton"
+import { ChevronDown, ChevronRight, ChevronLeft, Plus, Pencil, Download, RotateCcw, RotateCw, History, X, Save } from "lucide-react"
+import { PoseSidebar } from "./components/pose-sidebar"
+import HandDrawnSpiral from "@/components/hand-drawn-spiral"
+import { SortablePoseItem } from "./components/sortable-pose-item"
+import { 
+  DndContext, 
+  closestCenter, 
+  KeyboardSensor, 
+  PointerSensor, 
+  useSensor, 
+  useSensors,
+  DragEndEvent,
+  DragOverEvent,
+  DragStartEvent,
+  DragOverlay 
+} from "@dnd-kit/core"
+import { 
+  arrayMove, 
+  SortableContext, 
+  sortableKeyboardCoordinates, 
+  verticalListSortingStrategy 
+} from "@dnd-kit/sortable"
+import { restrictToParentElement, restrictToVerticalAxis } from "@dnd-kit/modifiers"
+
+interface PoseData {
+  id: string
+  name: string
+  sanskrit_name: string | null
+  category: string | null
+  difficulty: string | null
+  side_option: string | null
+}
+
+export default function SequenceEditorPage() {
+  const params = useParams()
+  const router = useRouter()
+  const { showToast } = useToast()
+  const sequenceId = params?.id as string
+  
+  const [isLoading, setIsLoading] = useState(true)
+  const [isPosesLoading, setIsPosesLoading] = useState(false)
+  const [sequence, setSequence] = useState<Sequence | null>(null)
+  const [structureLoaded, setStructureLoaded] = useState(false)
+  const [selectedPhaseIndex, setSelectedPhaseIndex] = useState(0)
+  const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true)
+  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true)
+  const [expandedPhases, setExpandedPhases] = useState<string[]>([])
+  const [isDragging, setIsDragging] = useState(false)
+  const [draggedPose, setDraggedPose] = useState<SequencePose | null>(null)
+  const [dragOverPhaseId, setDragOverPhaseId] = useState<string | null>(null)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [isExiting, setIsExiting] = useState(false)
+  const [isEditingSettings, setIsEditingSettings] = useState(false)
+  const [tempSettings, setTempSettings] = useState<{
+    name: string;
+    description: string;
+    duration_minutes: number;
+    difficulty: string;
+    style: string;
+    focus: string;
+  } | null>(null)
+  const [historyStack, setHistoryStack] = useState<Array<{
+    sequence: Sequence;
+    action: string;
+    timestamp: number;
+  }>>([])
+  const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1)
+  const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false)
+  const [activeSidebarTab, setActiveSidebarTab] = useState<'phases' | 'history'>('phases')
+  const [isHistoryDiscardDialogOpen, setIsHistoryDiscardDialogOpen] = useState(false)
+  const [pendingHistoryAction, setPendingHistoryAction] = useState<{
+    sequence: Sequence;
+    action: string;
+  } | null>(null)
+  
+  // Refs
+  const mainContentRef = useRef<HTMLDivElement | null>(null)
+  const headerRef = useRef<HTMLDivElement | null>(null)
+  const phaseRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const isPoseGenerationInProgress = useRef(false);
+  
+  // Add sensors for drag and drop
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+  
+  // Add state for active drag
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activePhaseId, setActivePhaseId] = useState<string | null>(null);
+  
+  // Add state for side selection modal
+  const [pendingPoseWithSideOption, setPendingPoseWithSideOption] = useState<{
+    poseData: PoseData;
+    phaseId: string;
+    targetPoseId?: string;
+  } | null>(null);
+  
+  // Fetch sequence data from localStorage (beta approach)
+  useEffect(() => {
+    if (!sequenceId) {
+      router.push('/')
+      return
+    }
+
+    try {
+      const sequencesJson = localStorage.getItem("generatedSequences")
+      if (!sequencesJson) {
+        // If no sequences found, redirect to home
+        router.push('/')
+        return
+      }
+
+      const sequences = JSON.parse(sequencesJson)
+      const foundSequence = sequences.find((seq: Sequence) => seq.id === sequenceId)
+      
+      if (!foundSequence) {
+        // If sequence not found, redirect to home
+        router.push('/')
+        return
+      }
+      
+      setSequence(foundSequence)
+      
+      // Expand all phases by default instead of just the first one
+      if (foundSequence.phases && foundSequence.phases.length > 0) {
+        setExpandedPhases(foundSequence.phases.map((phase: SequencePhase) => phase.id))
+      }
+      
+      setIsLoading(false)
+    } catch (error) {
+      console.error("Error loading sequence:", error)
+      showToast("Failed to load sequence", "error")
+      router.push('/')
+    }
+  }, [sequenceId, router, showToast])
+  
+  // Beta feature - load a sample sequence if none found
+  const loadSampleSequence = () => {
+    // Generate a simple sample sequence for demonstration
+    const sampleSequence: Sequence = {
+      id: sequenceId,
+      name: "Sample Sequence",
+      description: "This is a sample sequence for demonstration",
+      duration_minutes: 30,
+      difficulty: "intermediate",
+      style: "vinyasa",
+      focus: "full body",
+      phases: [
+        {
+          id: "phase1",
+          name: "Warm Up",
+          description: "Gentle poses to warm up the body",
+          poses: [
+            {
+              id: "pose1",
+              pose_id: "pose1",
+              name: "Mountain Pose",
+              sanskrit_name: "Tadasana",
+              duration_seconds: 30,
+              position: 1,
+              image_url: "/poses/mountain.jpg"
+            },
+            {
+              id: "pose2",
+              pose_id: "pose2",
+              name: "Standing Forward Fold",
+              sanskrit_name: "Uttanasana",
+              duration_seconds: 45,
+              position: 2,
+              image_url: "/poses/forward-fold.jpg"
+            }
+          ]
+        },
+        {
+          id: "phase2",
+          name: "Main Sequence",
+          description: "Core practice poses",
+          poses: [
+            {
+              id: "pose3",
+              pose_id: "pose3",
+              name: "Warrior I",
+              sanskrit_name: "Virabhadrasana I",
+              duration_seconds: 60,
+              side: "right",
+              position: 3,
+              image_url: "/poses/warrior-1.jpg"
+            },
+            {
+              id: "pose4",
+              pose_id: "pose3",
+              name: "Warrior I",
+              sanskrit_name: "Virabhadrasana I",
+              duration_seconds: 60,
+              side: "left",
+              position: 4,
+              image_url: "/poses/warrior-1.jpg"
+            },
+            {
+              id: "pose5",
+              pose_id: "pose4",
+              name: "Triangle Pose",
+              sanskrit_name: "Trikonasana",
+              duration_seconds: 45,
+              side: "right",
+              position: 5,
+              image_url: "/poses/triangle.jpg"
+            },
+            {
+              id: "pose6",
+              pose_id: "pose4",
+              name: "Triangle Pose",
+              sanskrit_name: "Trikonasana",
+              duration_seconds: 45,
+              side: "left",
+              position: 6,
+              image_url: "/poses/triangle.jpg"
+            }
+          ]
+        },
+        {
+          id: "phase3",
+          name: "Cool Down",
+          description: "Gentle poses to end practice",
+          poses: [
+            {
+              id: "pose7",
+              pose_id: "pose5",
+              name: "Seated Forward Bend",
+              sanskrit_name: "Paschimottanasana",
+              duration_seconds: 60,
+              position: 7,
+              image_url: "/poses/seated-forward-bend.jpg"
+            },
+            {
+              id: "pose8",
+              pose_id: "pose6",
+              name: "Corpse Pose",
+              sanskrit_name: "Savasana",
+              duration_seconds: 180,
+              position: 8,
+              image_url: "/poses/savasana.jpg"
+            }
+          ]
+        }
+      ],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      is_favorite: false
+    }
+    
+    setSequence(sampleSequence)
+    
+    // Store in localStorage for demo purposes
+    const sequencesJson = localStorage.getItem("generatedSequences")
+    const sequences = sequencesJson ? JSON.parse(sequencesJson) : []
+    sequences.push(sampleSequence)
+    localStorage.setItem("generatedSequences", JSON.stringify(sequences))
+  }
+  
+  // Save state to history
+  const saveToHistory = (newSequence: Sequence, action: string) => {
+    // Create a deep copy to avoid reference issues
+    const sequenceCopy = JSON.parse(JSON.stringify(newSequence))
+    
+    // If we're not at the end of the history stack, we need to confirm
+    // that the user wants to discard future history states
+    if (currentHistoryIndex < historyStack.length - 1) {
+      // Store the pending action
+      setPendingHistoryAction({
+        sequence: sequenceCopy,
+        action
+      })
+      
+      // Show confirmation dialog
+      setIsHistoryDiscardDialogOpen(true)
+      return
+    }
+    
+    // Normal case - adding to the end of history
+    const historyEntry = {
+      sequence: sequenceCopy,
+      action,
+      timestamp: Date.now()
+    }
+    
+    setHistoryStack(prev => [...prev, historyEntry])
+    setCurrentHistoryIndex(prev => prev + 1)
+  }
+  
+  // Function to confirm discarding future history
+  const confirmDiscardHistory = () => {
+    if (!pendingHistoryAction) return
+    
+    // Remove all future states
+    const updatedStack = historyStack.slice(0, currentHistoryIndex + 1)
+    
+    // Add the new state
+    const historyEntry = {
+      sequence: pendingHistoryAction.sequence,
+      action: pendingHistoryAction.action,
+      timestamp: Date.now()
+    }
+    
+    // Update the history stack and current index
+    setHistoryStack([...updatedStack, historyEntry])
+    setCurrentHistoryIndex(updatedStack.length)
+    
+    // Also update the sequence state to reflect the change
+    setSequence(pendingHistoryAction.sequence)
+    
+    // Mark that there are unsaved changes
+    setHasUnsavedChanges(true)
+    
+    // Clear the dialog and pending action
+    setIsHistoryDiscardDialogOpen(false)
+    setPendingHistoryAction(null)
+  }
+  
+  // Function to cancel the discard operation
+  const cancelDiscardHistory = () => {
+    setIsHistoryDiscardDialogOpen(false)
+    setPendingHistoryAction(null)
+  }
+  
+  // Navigate through history
+  const navigateHistory = (index: number) => {
+    if (index >= 0 && index < historyStack.length) {
+      // Retrieve sequence state from history
+      const historicalState = historyStack[index]
+      const historicalSequence = JSON.parse(JSON.stringify(historicalState.sequence))
+      setSequence(historicalSequence)
+      setCurrentHistoryIndex(index)
+    }
+  }
+  
+  // Undo last change
+  const handleUndo = () => {
+    if (currentHistoryIndex > 0) {
+      navigateHistory(currentHistoryIndex - 1)
+    }
+  }
+  
+  // Redo previously undone change
+  const handleRedo = () => {
+    if (currentHistoryIndex < historyStack.length - 1) {
+      navigateHistory(currentHistoryIndex + 1)
+    }
+  }
+  
+  // Initialize history when sequence first loads
+  useEffect(() => {
+    if (sequence && historyStack.length === 0) {
+      // Create a deep copy to avoid reference issues
+      const sequenceCopy = JSON.parse(JSON.stringify(sequence))
+      setHistoryStack([{
+        sequence: sequenceCopy,
+        action: "Initial state",
+        timestamp: Date.now()
+      }])
+      setCurrentHistoryIndex(0)
+    }
+  }, [sequence, historyStack.length])
+  
+  // Add keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check if focus is in an input or textarea
+      if (
+        document.activeElement?.tagName === 'INPUT' || 
+        document.activeElement?.tagName === 'TEXTAREA'
+      ) {
+        return;
+      }
+      
+      // Undo: Ctrl+Z or Cmd+Z
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      }
+      
+      // Redo: Ctrl+Y or Ctrl+Shift+Z or Cmd+Shift+Z
+      if (
+        ((e.ctrlKey || e.metaKey) && e.key === 'y') || 
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z')
+      ) {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentHistoryIndex, historyStack.length]);
+  
+  // Handler for updating pose duration
+  const handleDurationChange = (poseId: string, newDuration: number) => {
+    if (!sequence) return
+    
+    // Find the pose to include its name in the history action
+    let poseName = "";
+    sequence.phases.forEach(phase => {
+      phase.poses.forEach(pose => {
+        if (pose.id === poseId) {
+          poseName = pose.name;
+        }
+      });
+    });
+
+    const updatedPhases = sequence.phases.map(phase => ({
+      ...phase,
+      poses: phase.poses.map(pose => {
+        if (pose.id === poseId) {
+          return {
+            ...pose,
+            duration_seconds: newDuration
+          }
+        }
+        return pose
+      })
+    }))
+
+    const updatedSequence = {
+      ...sequence,
+      phases: updatedPhases
+    }
+    
+    setSequence(updatedSequence)
+    saveToHistory(updatedSequence, `Changed duration for "${poseName}"`)
+  }
+  
+  // Toggle pose sides
+  const togglePoseSide = (poseId: string) => {
+    if (!sequence) return
+    
+    // Find the pose to include its name in the history action
+    let poseName = "";
+    let currentSide = "";
+    sequence.phases.forEach(phase => {
+      phase.poses.forEach(pose => {
+        if (pose.id === poseId) {
+          poseName = pose.name;
+          currentSide = pose.side === "left" ? "right" : "left";
+        }
+      });
+    });
+
+    const updatedPhases = sequence.phases.map(phase => ({
+      ...phase,
+      poses: phase.poses.map(pose => {
+        if (pose.id === poseId) {
+          return {
+            ...pose,
+            side: pose.side === "left" ? ("right" as const) : ("left" as const)
+          }
+        }
+        return pose
+      })
+    }))
+
+    const updatedSequence = {
+      ...sequence,
+      phases: updatedPhases
+    }
+    
+    setSequence(updatedSequence)
+    saveToHistory(updatedSequence, `Changed "${poseName}" to ${currentSide} side`)
+  }
+  
+  // Add effect to track changes
+  useEffect(() => {
+    if (sequence) {
+      setHasUnsavedChanges(true)
+    }
+  }, [sequence])
+
+  // Add effect to handle beforeunload
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault()
+        e.returnValue = ""
+      }
+    }
+
+    window.addEventListener("beforeunload", handleBeforeUnload)
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload)
+  }, [hasUnsavedChanges])
+
+  const handleExit = () => {
+    if (hasUnsavedChanges) {
+      setIsExiting(true)
+    } else {
+      router.push('/')
+    }
+  }
+
+  const handleSave = async () => {
+    if (!sequence) return
+
+    try {
+      const sequencesJson = localStorage.getItem("generatedSequences")
+      const sequences = sequencesJson ? JSON.parse(sequencesJson) : []
+      
+      const updatedSequences = sequences.map((seq: Sequence) => 
+        seq.id === sequence.id ? sequence : seq
+      )
+      
+      localStorage.setItem("generatedSequences", JSON.stringify(updatedSequences))
+      setHasUnsavedChanges(false)
+      showToast("Sequence saved successfully", "success")
+      
+      // Add save action to history
+      saveToHistory(sequence, "Saved sequence")
+      
+      // Ensure all phases remain expanded
+      if (sequence.phases && sequence.phases.length > 0) {
+        const allPhaseIds = sequence.phases.map(phase => phase.id);
+        setExpandedPhases(allPhaseIds);
+      }
+
+      // If we were exiting, now we can safely exit
+      if (isExiting) {
+        router.push('/')
+      }
+    } catch (error) {
+      console.error("Error saving sequence:", error)
+      showToast("Failed to save sequence", "error")
+    }
+  }
+  
+  const togglePhaseExpansion = (phaseId: string) => {
+    setExpandedPhases(prev => 
+      prev.includes(phaseId) 
+        ? prev.filter(id => id !== phaseId)
+        : [...prev, phaseId]
+    )
+  }
+
+  // Legacy versions for standard HTML drag events
+  const handleDragOverLegacy = (e: React.DragEvent<HTMLDivElement>, phaseId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverPhaseId(phaseId);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverPhaseId(null);
+  };
+
+  // DndKit event handlers
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    setActiveId(active.id as string);
+    
+    // Find the phase this pose belongs to
+    if (sequence) {
+      for (const phase of sequence.phases) {
+        if (phase.poses.some(pose => pose.id === active.id)) {
+          setActivePhaseId(phase.id);
+          break;
+        }
+      }
+    }
+    
+    setIsDragging(true);
+    
+    // Find the pose that's being dragged
+    const draggedPose = findPoseById(active.id as string);
+    setDraggedPose(draggedPose);
+  };
+  
+  const handleDndDragOver = (event: DragOverEvent) => {
+    const { active, over } = event;
+    
+    if (!over) {
+      setDragOverPhaseId(null);
+      return;
+    }
+    
+    // Find which phase the over item belongs to
+    let overPhaseId = null;
+    
+    // If over element is a pose, find its phase
+    if (sequence) {
+      for (const phase of sequence.phases) {
+        // If directly over a pose, check that
+        if (phase.poses.some(pose => pose.id === over.id)) {
+          overPhaseId = phase.id;
+          break;
+        }
+      }
+      
+      // If we found the over phase, highlight it
+      if (overPhaseId) {
+        setDragOverPhaseId(overPhaseId);
+      }
+    }
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    setActiveId(null);
+    setActivePhaseId(null);
+    setIsDragging(false);
+    setDraggedPose(null);
+    setDragOverPhaseId(null);
+    
+    if (!over || !sequence) return;
+    
+    // Find the phase IDs for the active and over items
+    let sourcePhaseId: string | null = null;
+    let destinationPhaseId: string | null = null;
+    let sourcePhaseIndex = -1;
+    let destinationPhaseIndex = -1;
+    let sourcePoseIndex = -1;
+    let destinationPoseIndex = -1;
+    
+    // Find the source phase and pose indices
+    sequence.phases.forEach((phase, phaseIndex) => {
+      const poseIndex = phase.poses.findIndex(p => p.id === active.id);
+      if (poseIndex !== -1) {
+        sourcePhaseId = phase.id;
+        sourcePhaseIndex = phaseIndex;
+        sourcePoseIndex = poseIndex;
+      }
+    });
+    
+    // Find the destination phase and pose indices
+    sequence.phases.forEach((phase, phaseIndex) => {
+      const poseIndex = phase.poses.findIndex(p => p.id === over.id);
+      if (poseIndex !== -1) {
+        destinationPhaseId = phase.id;
+        destinationPhaseIndex = phaseIndex;
+        destinationPoseIndex = poseIndex;
+      }
+    });
+    
+    // If we couldn't find the source, do nothing
+    if (sourcePhaseId === null || sourcePhaseIndex === -1 || sourcePoseIndex === -1) {
+      return;
+    }
+    
+    // If destination is not found, it might be an empty phase or something else, so don't handle that case
+    if (destinationPhaseId === null || destinationPhaseIndex === -1 || destinationPoseIndex === -1) {
+      return;
+    }
+    
+    // Clone the sequence to avoid direct state mutations
+    const updatedSequence = JSON.parse(JSON.stringify(sequence)) as Sequence;
+    
+    // Same phase, just reorder
+    if (sourcePhaseId === destinationPhaseId) {
+      const phase = updatedSequence.phases[sourcePhaseIndex];
+      
+      // Use arrayMove to reorder the poses within the phase
+      phase.poses = arrayMove(phase.poses, sourcePoseIndex, destinationPoseIndex);
+      
+      // Update positions to reflect new order
+      phase.poses.forEach((pose, idx) => {
+        pose.position = idx + 1;
+      });
+      
+      // Get the name of the moved pose for the history action
+      const poseName = phase.poses[destinationPoseIndex].name;
+      
+      setSequence(updatedSequence);
+      saveToHistory(updatedSequence, `Reordered "${poseName}" in ${phase.name}`);
+    } 
+    // Different phases, move between them
+    else {
+      const sourcePhase = updatedSequence.phases[sourcePhaseIndex];
+      const destinationPhase = updatedSequence.phases[destinationPhaseIndex];
+      
+      // Get the pose to move
+      const poseToMove = sourcePhase.poses[sourcePoseIndex];
+      
+      // Get the name of the moved pose for the history action
+      const poseName = poseToMove.name;
+      
+      // Remove from source phase
+      sourcePhase.poses.splice(sourcePoseIndex, 1);
+      
+      // Add to destination phase
+      destinationPhase.poses.splice(destinationPoseIndex, 0, poseToMove);
+      
+      // Update positions in both phases
+      sourcePhase.poses.forEach((pose, idx) => {
+        pose.position = idx + 1;
+      });
+      
+      destinationPhase.poses.forEach((pose, idx) => {
+        pose.position = idx + 1;
+      });
+      
+      setSequence(updatedSequence);
+      saveToHistory(updatedSequence, `Moved "${poseName}" from ${sourcePhase.name} to ${destinationPhase.name}`);
+    }
+  };
+
+  // Handle side selection and add the pose
+  const handleSideSelection = (selectedSide: "left" | "right" | "both" | null) => {
+    if (!pendingPoseWithSideOption || !sequence) return;
+    
+    const { poseData, phaseId, targetPoseId } = pendingPoseWithSideOption;
+    
+    // Find the phase name for history
+    const targetPhase = sequence.phases.find(phase => phase.id === phaseId);
+    const phaseName = targetPhase ? targetPhase.name : "phase";
+
+    const updatedPhases = sequence.phases.map((phase: SequencePhase) => {
+      if (phase.id === phaseId) {
+        let updatedPoses = [...phase.poses];
+        
+        if (selectedSide === "both") {
+          // Create the left side pose first
+          const leftPose = {
+            id: `${poseData.id}-left-${Date.now()}`,
+            pose_id: poseData.id,
+            name: poseData.name,
+            sanskrit_name: poseData.sanskrit_name || undefined,
+            duration_seconds: 30,
+            position: 0, // Will be updated below
+            side: "left",
+            side_option: poseData.side_option
+          } as SequencePose;
+          
+          // Create the right side pose
+          const rightPose = {
+            id: `${poseData.id}-right-${Date.now()}`,
+            pose_id: poseData.id,
+            name: poseData.name,
+            sanskrit_name: poseData.sanskrit_name || undefined,
+            duration_seconds: 30,
+            position: 0, // Will be updated below
+            side: "right",
+            side_option: poseData.side_option
+          } as SequencePose;
+          
+          // If dropping at a specific pose, insert at that position
+          if (targetPoseId) {
+            const targetIndex = updatedPoses.findIndex(p => p.id === targetPoseId);
+            if (targetIndex !== -1) {
+              // Insert both poses at the target position
+              updatedPoses.splice(targetIndex, 0, leftPose, rightPose);
+            } else {
+              updatedPoses.push(leftPose, rightPose);
+            }
+          } else {
+            // No target, add to the end
+            updatedPoses.push(leftPose, rightPose);
+          }
+        } else {
+          // Create a single pose with the selected side (original behavior)
+          const newPose = {
+            id: `${poseData.id}-${Date.now()}`,
+            pose_id: poseData.id,
+            name: poseData.name,
+            sanskrit_name: poseData.sanskrit_name || undefined,
+            duration_seconds: 30,
+            position: 0, // Will be updated below
+            side: selectedSide,
+            side_option: poseData.side_option
+          } as SequencePose;
+          
+          // If dropping at a specific pose, insert at that position
+          if (targetPoseId) {
+            const targetIndex = updatedPoses.findIndex(p => p.id === targetPoseId);
+            if (targetIndex !== -1) {
+              updatedPoses.splice(targetIndex, 0, newPose);
+            } else {
+              updatedPoses.push(newPose);
+            }
+          } else {
+            // No target, add to the end
+            updatedPoses.push(newPose);
+          }
+        }
+        
+        // Update positions for all poses
+        updatedPoses = updatedPoses.map((pose, index) => ({
+          ...pose,
+          position: index + 1
+        }));
+        
+        return {
+          ...phase,
+          poses: updatedPoses
+        };
+      }
+      return phase;
+    });
+
+    const updatedSequence = {
+      ...sequence,
+      phases: updatedPhases
+    };
+    
+    setSequence(updatedSequence);
+    
+    // Update history message based on selection
+    const historyMessage = selectedSide === "both" 
+      ? `Added "${poseData.name}" (both sides) to ${phaseName}`
+      : `Added "${poseData.name}" (${selectedSide || 'center'}) to ${phaseName}`;
+    
+    saveToHistory(updatedSequence, historyMessage);
+    setPendingPoseWithSideOption(null);
+  };
+
+  // Update handleDrop to check for side options
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, phaseId: string, targetPoseId?: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverPhaseId(null);
+
+    try {
+      const poseData = JSON.parse(e.dataTransfer.getData("pose")) as PoseData;
+      if (!sequence) return;
+      
+      // If pose has side options, show the selection dialog
+      if (poseData.side_option === "left_right" || poseData.side_option === "both") {
+        setPendingPoseWithSideOption({
+          poseData,
+          phaseId,
+          targetPoseId
+        });
+        return;
+      }
+      
+      // Original behavior for poses without side options
+      const targetPhase = sequence.phases.find(phase => phase.id === phaseId);
+      const phaseName = targetPhase ? targetPhase.name : "phase";
+
+      const updatedPhases = sequence.phases.map((phase: SequencePhase) => {
+        if (phase.id === phaseId) {
+          const newPose = {
+            id: `${poseData.id}-${Date.now()}`,
+            pose_id: poseData.id,
+            name: poseData.name,
+            sanskrit_name: poseData.sanskrit_name || undefined,
+            duration_seconds: 30,
+            position: 0,
+            side: null,
+            side_option: poseData.side_option
+          } as SequencePose;
+          
+          let updatedPoses = [...phase.poses];
+          
+          if (targetPoseId) {
+            const targetIndex = updatedPoses.findIndex(p => p.id === targetPoseId);
+            if (targetIndex !== -1) {
+              updatedPoses.splice(targetIndex, 0, newPose);
+            } else {
+              updatedPoses.push(newPose);
+            }
+          } else {
+            updatedPoses.push(newPose);
+          }
+          
+          updatedPoses = updatedPoses.map((pose, index) => ({
+            ...pose,
+            position: index + 1
+          }));
+          
+          return {
+            ...phase,
+            poses: updatedPoses
+          };
+        }
+        return phase;
+      });
+
+      const updatedSequence = {
+        ...sequence,
+        phases: updatedPhases
+      };
+      
+      setSequence(updatedSequence);
+      saveToHistory(updatedSequence, `Added "${poseData.name}" to ${phaseName}`);
+    } catch (error) {
+      console.error("Error handling pose drop:", error);
+    }
+  };
+
+  // Create a drop handler that captures the target pose
+  const createPoseDropHandler = (phaseId: string, targetPoseId: string) => (e: React.DragEvent<HTMLDivElement>) => {
+    handleDrop(e, phaseId, targetPoseId);
+  };
+
+  // Initialize temp settings when sequence loads
+  useEffect(() => {
+    if (sequence) {
+      setTempSettings({
+        name: sequence.name,
+        description: sequence.description || "",
+        duration_minutes: sequence.duration_minutes,
+        difficulty: sequence.difficulty,
+        style: sequence.style,
+        focus: sequence.focus
+      });
+    }
+  }, [sequence]);
+
+  const handleStartEditing = () => {
+    if (!isEditingSettings && sequence) {
+      setTempSettings({
+        name: sequence.name,
+        description: sequence.description || "",
+        duration_minutes: sequence.duration_minutes,
+        difficulty: sequence.difficulty,
+        style: sequence.style,
+        focus: sequence.focus
+      });
+      setIsEditingSettings(true);
+    }
+  }
+
+  const handleSettingsSave = () => {
+    if (!sequence || !tempSettings) return;
+    
+    const updatedSequence = {
+      ...sequence,
+      name: tempSettings.name,
+      description: tempSettings.description,
+      duration_minutes: tempSettings.duration_minutes,
+      difficulty: tempSettings.difficulty,
+      style: tempSettings.style,
+      focus: tempSettings.focus
+    };
+    
+    setSequence(updatedSequence)
+    saveToHistory(updatedSequence, "Updated sequence settings")
+    
+    setIsEditingSettings(false);
+    showToast("Sequence settings updated", "success");
+  }
+
+  const handleSettingsCancel = () => {
+    if (sequence) {
+      setTempSettings({
+        name: sequence.name,
+        description: sequence.description || "",
+        duration_minutes: sequence.duration_minutes,
+        difficulty: sequence.difficulty,
+        style: sequence.style,
+        focus: sequence.focus
+      });
+    }
+    setIsEditingSettings(false);
+  }
+  
+  const handlePhaseSelect = (index: number, phaseId: string) => {
+    setSelectedPhaseIndex(index);
+    
+    // Ensure phase is expanded
+    if (!expandedPhases.includes(phaseId)) {
+      setExpandedPhases(prev => [...prev, phaseId]);
+    }
+    
+    // Scroll to the phase after a small delay to ensure expansion is complete
+    setTimeout(() => {
+      if (phaseRefs.current[phaseId] && mainContentRef.current && headerRef.current) {
+        const phaseElement = phaseRefs.current[phaseId];
+        const mainContent = mainContentRef.current;
+        const header = headerRef.current;
+        
+        // Calculate the header height to account for it in the scroll offset
+        const headerHeight = header.offsetHeight;
+        
+        // Calculate the scroll position to place the phase at the top, with extra 10px offset
+        const scrollPosition = phaseElement.offsetTop - mainContent.offsetTop - headerHeight - 10;
+        
+        // Smooth scroll to the position
+        mainContent.scrollTo({
+          top: scrollPosition,
+          behavior: 'smooth'
+        });
+      }
+    }, 100);
+  };
+  
+  // Add this effect to handle 404 cases
+  useEffect(() => {
+    const fetchSequence = async () => {
+      try {
+        setIsLoading(true)
+        console.log(`Client: Fetching sequence with ID: ${sequenceId}`);
+        
+        // First try to load from localStorage
+        try {
+          const localSequences = localStorage.getItem("generatedSequences");
+          if (localSequences) {
+            const sequences = JSON.parse(localSequences);
+            const localSequence = sequences.find((seq: any) => seq.id === sequenceId);
+            
+            if (localSequence) {
+              console.log(`Client: Found sequence in localStorage: ${sequenceId}`);
+              
+              // Always expand all phases when displaying sequences
+              let phasesToExpand: string[] = [];
+              if (localSequence.phases && localSequence.phases.length > 0) {
+                // Make sure we get ALL phases, not just the first one
+                phasesToExpand = localSequence.phases.map((phase: any) => phase.id);
+                console.log("Initial phases to expand:", phasesToExpand);
+              }
+              
+              // Check if sequence has poses or just structure
+              const isStructureOnly = localSequence.structureOnly === true;
+              
+              // If we have the structure but poses are loading placeholders
+              if (isStructureOnly) {
+                console.log(`Client: Found structure-only sequence, showing skeletons for poses`);
+                setSequence(localSequence);
+                setStructureLoaded(true);
+                setIsPosesLoading(true);
+                setExpandedPhases(phasesToExpand); // Expand all phases
+              } else {
+                // Full sequence with poses
+                console.log(`Client: Found complete sequence with poses`);
+                setSequence(localSequence);
+                setIsPosesLoading(false);
+                
+                // Expand all phases for complete sequences too
+                setExpandedPhases(phasesToExpand);
+              }
+              
+              setIsLoading(false);
+              return;
+            }
+          }
+        } catch (localError) {
+          console.error("Error checking localStorage:", localError);
+        }
+        
+        // If not in localStorage, try the API
+        console.log(`Client: Not found in localStorage, trying API for: ${sequenceId}`);
+        const response = await fetch(`/api/sequences/${sequenceId}?t=${Date.now()}`);
+        
+        if (!response.ok) {
+          console.log(`Client: Error response ${response.status}: ${response.statusText}`);
+          
+          if (response.status === 404) {
+            console.log("Client: Sequence not found, redirecting to home page");
+            showToast("Sequence not found", "error");
+            router.push('/');
+            return;
+          }
+          
+          throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log(`Client: Successfully fetched sequence:`, data.id);
+        setSequence(data);
+        setIsPosesLoading(false);
+      } catch (error) {
+        console.error("Client: Failed to fetch sequence:", error);
+        showToast("Failed to load sequence", "error");
+        // Redirect to home after error
+        router.push('/');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (sequenceId) {
+      fetchSequence();
+    }
+  }, [sequenceId, showToast, router]);
+  
+  // Add effect to complete pose generation if we're viewing a structure-only sequence
+  useEffect(() => {
+    // Only proceed if we have a structure-only sequence
+    if (sequence && sequence.structureOnly && isPosesLoading && !isPoseGenerationInProgress.current) {
+      console.log(`Client: Generating poses for structure-only sequence: ${sequence.id}`);
+      
+      // Set flag to prevent duplicate requests
+      isPoseGenerationInProgress.current = true;
+      
+      const completePoseGeneration = async () => {
+        try {
+          const response = await fetch(`/api/sequences/complete-poses`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              sequenceId: sequence.id,
+              difficulty: sequence.difficulty,
+              style: sequence.style,
+              focus: sequence.focus,
+              // Send the full structure to the API
+              structure: sequence
+            })
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
+          }
+          
+          const data = await response.json();
+          console.log(`Client: Received complete sequence with poses:`, data.id);
+          
+          // Update localStorage with the completed sequence
+          try {
+            const localSequences = localStorage.getItem("generatedSequences");
+            if (localSequences) {
+              const sequences = JSON.parse(localSequences);
+              const updatedSequences = sequences.map((seq: any) => 
+                seq.id === data.id ? data : seq
+              );
+              localStorage.setItem("generatedSequences", JSON.stringify(updatedSequences));
+              
+              // Ensure we have the current expanded phases state
+              const currentExpandedPhases = [...expandedPhases];
+              
+              // Update state - ensure we use a functional update to access latest state
+              setSequence((prevSequence) => {
+                if (!prevSequence) return data;
+                
+                // Extract ALL phase IDs from the completed sequence
+                if (!data.phases || !Array.isArray(data.phases)) {
+                  console.error("Invalid phases data:", data.phases);
+                  return data;
+                }
+                
+                // PRESERVE ORIGINAL PHASE STRUCTURE
+                // Instead of replacing the sequence with the AI response,
+                // map the AI-generated poses to the original phase structure
+                
+                // First, create a map of all poses from the AI response
+                const allGeneratedPoses = data.phases.flatMap((phase: SequencePhase) => phase.poses || []);
+                
+                // Create an updated version of the original sequence structure
+                const preservedSequence = {
+                  ...prevSequence,
+                  // Keep most properties from the original
+                  name: data.name || prevSequence.name,
+                  description: data.description || prevSequence.description,
+                  structureOnly: false, // Mark as completed
+                  // Preserve the original phases but fill with generated poses
+                  phases: prevSequence.phases.map((originalPhase, phaseIndex) => {
+                    // Calculate how many poses to assign to this phase
+                    // Use a distribution proportional to the original phase structure
+                    const phaseRatio = 1 / prevSequence.phases.length;
+                    const poseCount = Math.max(
+                      2, // Minimum 2 poses per phase
+                      Math.floor(allGeneratedPoses.length * phaseRatio)
+                    );
+                    
+                    // Calculate the starting index for poses in this phase
+                    const startIdx = phaseIndex * poseCount;
+                    // Get poses for this phase, limited by available poses
+                    const phasePoses = allGeneratedPoses.slice(
+                      startIdx,
+                      startIdx + poseCount
+                    );
+                    
+                    // Preserve the original phase ID and metadata
+                    return {
+                      ...originalPhase,
+                      poses: phasePoses.map((pose: SequencePose, poseIdx: number) => {
+                        // Preserve ALL pose properties, especially side and side_option
+                        // Make sure we keep these important bilateral properties
+                        if (!pose.side && pose.side_option === "left_right") {
+                          // If the pose has a left_right option but no side was assigned,
+                          // default to 'left' side for the first occurrence
+                          console.log(`Setting default 'left' side for bilateral pose: ${pose.name}`);
+                          return {
+                            ...pose,
+                            side: "left", // Assign a default side
+                            position: poseIdx + 1, // Ensure positions are sequential
+                          };
+                        }
+                        
+                        // Keep all existing properties including side info
+                        return {
+                          ...pose,
+                          position: poseIdx + 1, // Ensure positions are sequential
+                        };
+                      })
+                    };
+                  })
+                };
+                
+                // Extract just the phase IDs for logging
+                console.log(`Complete sequence with PRESERVED phase structure:`, {
+                  id: preservedSequence.id, 
+                  name: preservedSequence.name,
+                  phaseCount: preservedSequence.phases.length,
+                  phaseIds: preservedSequence.phases.map(p => p.id),
+                });
+                
+                // CRITICAL FIX: Update expanded phases to match the latest phase IDs immediately
+                // This ensures that we capture the correct IDs right at the moment of update
+                const currentPhaseIds = preservedSequence.phases.map(phase => phase.id);
+                
+                // Force a synchronous update to expanded phases
+                setExpandedPhases(currentPhaseIds);
+                
+                // Additional verification for debugging
+                console.log(`Updated expanded phases with ${currentPhaseIds.length} phase IDs:`, currentPhaseIds);
+                
+                return preservedSequence;
+              });
+              
+              setIsPosesLoading(false);
+              
+              showToast("Sequence with poses generated successfully!", "success");
+            }
+          } catch (localError) {
+            console.error("Error updating localStorage:", localError);
+          }
+        } catch (error) {
+          console.error("Client: Failed to complete pose generation:", error);
+          showToast("Failed to generate poses. Please try again later.", "error");
+          // Keep loading state, allow user to still work with the structure
+        } finally {
+          // Reset flag regardless of success/failure
+          isPoseGenerationInProgress.current = false;
+        }
+      };
+      
+      completePoseGeneration();
+    }
+  }, [sequence, isPosesLoading, showToast, expandedPhases]);
+  
+  // Helper function to find a pose by ID
+  const findPoseById = (poseId: string): SequencePose | null => {
+    if (!sequence) return null;
+    
+    for (const phase of sequence.phases) {
+      const pose = phase.poses.find(p => p.id === poseId);
+      if (pose) return pose;
+    }
+    
+    return null;
+  };
+    
+  // Add effect to ensure expandedPhases stay in sync with current phase IDs
+  useEffect(() => {
+    if (sequence && sequence.phases) {
+      // Only run this when the sequence transitions from structureOnly to complete
+      if (sequence.structureOnly === false) {
+        const allPhaseIds = sequence.phases.map(phase => phase.id);
+        console.log(`Setting ALL expanded phases after pose generation:`, allPhaseIds);
+        setExpandedPhases(allPhaseIds);
+        
+        // Add extra debugging to verify the phase IDs
+        setTimeout(() => {
+          console.log("VERIFICATION - Current expanded phases after update:", expandedPhases);
+          console.log("VERIFICATION - Current sequence phase IDs:", sequence.phases.map(p => p.id));
+        }, 100);
+      }
+    }
+  }, [sequence?.structureOnly]); // Only run when structureOnly changes from true to false
+}
+  

@@ -110,3 +110,5 @@ IMPORTANT PROJECT-SPECIFIC RULES:
    - Follow brutalist design aesthetic
    - Use Space Grotesk typography
    - Follow color system in design-guide.md
+
+6. ALWAYS USE gpt-4o-mini model for OPEN AI
