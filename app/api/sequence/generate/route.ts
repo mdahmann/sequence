@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
               // Just use the original supabase client which already has the token verification
               
               // Generate the sequence directly with the existing client
-              const sequence = await serverSequenceService.generateSequence(validatedParams.data)
+              const sequence = await serverSequenceService.generateSequence(validatedParams.data, verifiedUser.id)
               
               // Return generated sequence
               console.log("API route: Sequence generated successfully - returning 201")
@@ -156,6 +156,8 @@ export async function POST(req: NextRequest) {
       role: session.user.role
     })
     
+    const userId = session.user.id;
+    
     // Parse and validate request body
     const body = await req.json()
     const validatedParams = sequenceParamsSchema.safeParse(body)
@@ -170,7 +172,7 @@ export async function POST(req: NextRequest) {
     
     // Generate sequence
     console.log("API route: Generating sequence...")
-    const sequence = await serverSequenceService.generateSequence(validatedParams.data)
+    const sequence = await serverSequenceService.generateSequence(validatedParams.data, userId)
     
     // Return generated sequence
     console.log("API route: Sequence generated successfully - returning 201")

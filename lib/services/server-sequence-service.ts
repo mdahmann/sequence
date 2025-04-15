@@ -81,7 +81,8 @@ export const serverSequenceService = {
     return await createServerSupabaseClient();
   },
 
-  async generateSequence(params: SequenceParams): Promise<Sequence> {
+  async generateSequence(params: SequenceParams, userId: string): Promise<Sequence> {
+    if (!userId) throw new Error("UNAUTHENTICATED_USER");
     console.log("serverSequenceService: Generating sequence with params:", params)
     
     // Create a server-side Supabase client
@@ -295,10 +296,6 @@ export const serverSequenceService = {
           
           // Convert to our Sequence format
           const sequence = this.convertToSequenceFormat(generatedSequence, poses, params);
-          
-          // Get the current user's ID if available
-          const { data: { session } } = await supabase.auth.getSession();
-          const userId = session?.user?.id || uuidv4();
           
           // Store in database
           const { error: dbError } = await supabase

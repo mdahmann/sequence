@@ -8,18 +8,18 @@ export async function getYogaGuidelines(style?: string, focus?: string, difficul
   try {
     // If no parameters provided, try to read from the general guidelines file
     if (!style && !focus && !difficulty) {
-      const guidelinesPath = path.join(process.cwd(), 'yogaguidelines.md')
-      
-      try {
-        // Check if file exists first
-        await fs.access(guidelinesPath)
-        // If it does, read it
-        return await fs.readFile(guidelinesPath, 'utf8')
-      } catch (error) {
-        // File does not exist or cannot be accessed
-        console.error("Error accessing yoga guidelines:", error)
-        return ''
-      }
+    const guidelinesPath = path.join(process.cwd(), 'yogaguidelines.md')
+    
+    try {
+      // Check if file exists first
+      await fs.access(guidelinesPath)
+      // If it does, read it
+      return await fs.readFile(guidelinesPath, 'utf8')
+    } catch (error) {
+      // File does not exist or cannot be accessed
+      console.error("Error accessing yoga guidelines:", error)
+      return ''
+    }
     }
     
     // Normalize parameters

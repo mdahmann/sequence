@@ -232,7 +232,7 @@ export function FlowsList() {
 
           <CardFooter className="border-t pt-4 flex justify-between">
             <Button variant="outline" size="sm" asChild>
-              <Link href={`/flows/${sequence.id}`}>
+              <Link href={`/edit/${sequence.id}`}>
                 <Edit2 className="h-4 w-4 mr-2" />
                 Edit
               </Link>

@@ -56,6 +56,7 @@ export default function SequenceEditorPage() {
   const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true)
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true)
   const [expandedPhases, setExpandedPhases] = useState<string[]>([])
+  const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [draggedPose, setDraggedPose] = useState<SequencePose | null>(null)
   const [dragOverPhaseId, setDragOverPhaseId] = useState<string | null>(null)
@@ -83,20 +84,53 @@ export default function SequenceEditorPage() {
     sequence: Sequence;
     action: string;
   } | null>(null)
+  const [undoStack, setUndoStack] = useState<Sequence[]>([])
+  const [redoStack, setRedoStack] = useState<Sequence[]>([])
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
+  const [isEditingPhase, setIsEditingPhase] = useState<string | null>(null)
+  const [phaseNameInput, setPhaseNameInput] = useState("")
+  const [phaseDescriptionInput, setPhaseDescriptionInput] = useState("")
+  const [isEditingPose, setIsEditingPose] = useState<string | null>(null)
+  const [poseDurationInput, setPoseDurationInput] = useState("")
+  const [poseSideInput, setPoseSideInput] = useState<string | null>(null)
+  const [isEditingSequence, setIsEditingSequence] = useState(false)
+  const [sequenceNameInput, setSequenceNameInput] = useState("")
+  const [sequenceDescriptionInput, setSequenceDescriptionInput] = useState("")
+  const [isSaving, setIsSaving] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
+  const [isConfirmingReset, setIsConfirmingReset] = useState(false)
+  const [isResetting, setIsResetting] = useState(false)
+  const [isConfirmingUndo, setIsConfirmingUndo] = useState(false)
+  const [isConfirmingRedo, setIsConfirmingRedo] = useState(false)
+  const [isUndoing, setIsUndoing] = useState(false)
+  const [isRedoing, setIsRedoing] = useState(false)
+  const [isConfirmingClose, setIsConfirmingClose] = useState(false)
+  const [isClosing, setIsClosing] = useState(false)
+  const [isConfirmingNew, setIsConfirmingNew] = useState(false)
+  const [isCreatingNew, setIsCreatingNew] = useState(false)
+  const [isConfirmingDuplicate, setIsConfirmingDuplicate] = useState(false)
+  const [isDuplicating, setIsDuplicating] = useState(false)
+  const [isConfirmingExport, setIsConfirmingExport] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
+  const [isConfirmingImport, setIsConfirmingImport] = useState(false)
+  const [isImporting, setIsImporting] = useState(false)
+  const [isConfirmingShare, setIsConfirmingShare] = useState(false)
+  const [isSharing, setIsSharing] = useState(false)
+  const [isConfirmingPublish, setIsConfirmingPublish] = useState(false)
+  const [isPublishing, setIsPublishing] = useState(false)
+  const [isConfirmingUnpublish, setIsConfirmingUnpublish] = useState(false)
+  const [isUnpublishing, setIsUnpublishing] = useState(false)
   
   // Refs
   const mainContentRef = useRef<HTMLDivElement | null>(null)
   const headerRef = useRef<HTMLDivElement | null>(null)
   const phaseRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const isPoseGenerationInProgress = useRef(false);
   
   // Add sensors for drag and drop
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
+    useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -1075,21 +1109,10 @@ export default function SequenceEditorPage() {
               const allPhaseIds = localSequence.phases?.map((phase: any) => phase.id) || [];
               console.log("Initial phases to expand:", allPhaseIds);
               
-              // Check if sequence has poses or just structure
-              const isStructureOnly = localSequence.structureOnly === true;
-              
-              // If we have the structure but poses are loading placeholders
-              if (isStructureOnly) {
-                console.log(`Client: Found structure-only sequence, showing skeletons for poses`);
-                setSequence(localSequence);
-                setStructureLoaded(true);
-                setIsPosesLoading(true);
-              } else {
-                // Full sequence with poses
-                console.log(`Client: Found complete sequence with poses`);
-                setSequence(localSequence);
-                setIsPosesLoading(false);
-              }
+              // Set the sequence data
+              console.log(`Client: Found complete sequence with poses`);
+              setSequence(localSequence);
+              setIsPosesLoading(false);
               
               // Immediately set the expandedPhases after setting the sequence
               setExpandedPhases(allPhaseIds);
@@ -1148,184 +1171,6 @@ export default function SequenceEditorPage() {
     }
   }, [sequenceId, showToast, router]);
   
-  // Add effect to complete pose generation if we're viewing a structure-only sequence
-  useEffect(() => {
-    // Only proceed if we have a structure-only sequence
-    if (sequence && sequence.structureOnly && isPosesLoading && !isPoseGenerationInProgress.current) {
-      console.log(`Client: Generating poses for structure-only sequence: ${sequence.id}`);
-      
-      // Set flag to prevent duplicate requests
-      isPoseGenerationInProgress.current = true;
-      
-      const completePoseGeneration = async () => {
-        try {
-          const response = await fetch(`/api/sequences/complete-poses`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              sequenceId: sequence.id,
-              difficulty: sequence.difficulty,
-              style: sequence.style,
-              focus: sequence.focus,
-              // Send the full structure to the API
-              structure: sequence
-            })
-          });
-          
-          if (!response.ok) {
-            throw new Error(`Error ${response.status}: ${response.statusText}`);
-          }
-          
-          const data = await response.json();
-          console.log(`Client: Received complete sequence with poses:`, data.id);
-          
-          // Update localStorage with the completed sequence
-          try {
-            const localSequences = localStorage.getItem("generatedSequences");
-            if (localSequences) {
-              const sequences = JSON.parse(localSequences);
-              const updatedSequences = sequences.map((seq: any) => 
-                seq.id === data.id ? data : seq
-              );
-              localStorage.setItem("generatedSequences", JSON.stringify(updatedSequences));
-              
-              // Ensure we have the current expanded phases state
-              const currentExpandedPhases = [...expandedPhases];
-              
-              // Update state - ensure we use a functional update to access latest state
-              setSequence((prevSequence) => {
-                if (!prevSequence) return data;
-                
-                // Extract ALL phase IDs from the completed sequence
-                if (!data.phases || !Array.isArray(data.phases)) {
-                  console.error("Invalid phases data:", data.phases);
-                  return data;
-                }
-                
-                // PRESERVE ORIGINAL PHASE STRUCTURE
-                // Instead of replacing the sequence with the AI response,
-                // map the AI-generated poses to the original phase structure
-                
-                // First, create a map of all poses from the AI response
-                const allGeneratedPoses = data.phases.flatMap((phase: SequencePhase) => phase.poses || []);
-                
-                // Create an updated version of the original sequence structure
-                const preservedSequence = {
-                  ...prevSequence,
-                  // Keep most properties from the original
-                  name: data.name || prevSequence.name,
-                  description: data.description || prevSequence.description,
-                  structureOnly: false, // Mark as completed
-                  // Preserve the original phases but fill with generated poses
-                  phases: prevSequence.phases.map((originalPhase, phaseIndex) => {
-                    // Calculate how many poses to assign to this phase
-                    // Use a distribution proportional to the original phase structure
-                    const phaseRatio = 1 / prevSequence.phases.length;
-                    const poseCount = Math.max(
-                      2, // Minimum 2 poses per phase
-                      Math.floor(allGeneratedPoses.length * phaseRatio)
-                    );
-                    
-                    // Calculate the starting index for poses in this phase
-                    const startIdx = phaseIndex * poseCount;
-                    // Get poses for this phase, limited by available poses
-                    const phasePoses = allGeneratedPoses.slice(
-                      startIdx,
-                      startIdx + poseCount
-                    );
-                    
-                    // Preserve the original phase ID and metadata
-                    return {
-                      ...originalPhase,
-                      poses: phasePoses.map((pose: SequencePose, poseIdx: number) => {
-                        // Preserve ALL pose properties, especially side and side_option
-                        // Make sure we keep these important bilateral properties
-                        if (!pose.side && pose.side_option === "left_right") {
-                          // If the pose has a left_right option but no side was assigned,
-                          // default to 'left' side for the first occurrence
-                          console.log(`Setting default 'left' side for bilateral pose: ${pose.name}`);
-                          return {
-                            ...pose,
-                            side: "left", // Assign a default side
-                            position: poseIdx + 1, // Ensure positions are sequential
-                          };
-                        }
-                        
-                        // Keep all existing properties including side info
-                        return {
-                          ...pose,
-                          position: poseIdx + 1, // Ensure positions are sequential
-                        };
-                      })
-                    };
-                  })
-                };
-                
-                // Extract just the phase IDs for logging
-                console.log(`Complete sequence with PRESERVED phase structure:`, {
-                  id: preservedSequence.id, 
-                  name: preservedSequence.name,
-                  phaseCount: preservedSequence.phases.length,
-                  phaseIds: preservedSequence.phases.map(p => p.id),
-                });
-                
-                // CRITICAL FIX: Update expanded phases to match the latest phase IDs immediately
-                // This ensures that we capture the correct IDs right at the moment of update
-                const currentPhaseIds = preservedSequence.phases.map(phase => phase.id);
-                
-                // Force a synchronous update to expanded phases
-                setExpandedPhases(currentPhaseIds);
-                
-                // Additional verification for debugging
-                console.log(`Updated expanded phases with ${currentPhaseIds.length} phase IDs:`, currentPhaseIds);
-                
-                // Also store in sessionStorage for resilience
-                try {
-                  sessionStorage.setItem(`expandedPhases-${preservedSequence.id}`, JSON.stringify(currentPhaseIds));
-                  console.log("Saved expanded phases to sessionStorage");
-                } catch (e) {
-                  console.error("Failed to save to sessionStorage:", e);
-                }
-                
-                // Schedule another update after a delay to ensure it sticks
-                setTimeout(() => {
-                  console.log("Re-verifying expanded phases are set correctly");
-                  setExpandedPhases(currentPhaseIds);
-                }, 500);
-                
-                return preservedSequence;
-              });
-              
-              setIsPosesLoading(false);
-              
-              // We've moved this into the setTimeout above to ensure it happens after sequence is updated
-              // if (data.phases && data.phases.length > 0) {
-              //   const allPhaseIds = data.phases.map((phase: SequencePhase) => phase.id);
-              //   console.log("Setting expanded phases after pose generation:", allPhaseIds);
-              //   setExpandedPhases(allPhaseIds);
-              // }
-              
-              showToast("Sequence with poses generated successfully!", "success");
-            }
-          } catch (localError) {
-            console.error("Error updating localStorage:", localError);
-          }
-        } catch (error) {
-          console.error("Client: Failed to complete pose generation:", error);
-          showToast("Failed to generate poses. Please try again later.", "error");
-          // Keep loading state, allow user to still work with the structure
-        } finally {
-          // Reset flag regardless of success/failure
-          isPoseGenerationInProgress.current = false;
-        }
-      };
-      
-      completePoseGeneration();
-    }
-  }, [sequence, isPosesLoading, showToast, expandedPhases]);
-  
   // Helper function to find a pose by ID
   const findPoseById = (poseId: string): SequencePose | null => {
     if (!sequence) return null;
@@ -1376,7 +1221,6 @@ export default function SequenceEditorPage() {
       }
     }
   }, [sequence, expandedPhases]);
-  
   // Handle pose selection from sidebar
   const handlePoseSelect = (pose: any) => {
     if (!sequence) return;
@@ -1695,7 +1539,7 @@ export default function SequenceEditorPage() {
             ) : (
               /* Phases Navigation */
               <div className="px-2 py-2">
-                <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2 px-3">Sequence Phases</div>
+                <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2 px-3">Sequence Blocks</div>
                 <div className="space-y-1">
                   {sequence.phases.map((phase, index) => (
                     <button
