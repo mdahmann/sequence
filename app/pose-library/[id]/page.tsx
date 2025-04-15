@@ -4,6 +4,7 @@ import { PoseDetail } from "./components/pose-detail"
 import { RelatedPoses } from "./components/related-poses"
 import type { Pose } from "@/types/pose"
 import { PageContainer } from "@/components/page-container"
+export const revalidate = 86400; // Revalidate every 24 hours
 
 export default async function PoseDetailPage({ params }: { params: { id: string } }) {
   const supabase = createServerSupabaseClient()

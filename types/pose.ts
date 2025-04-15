@@ -33,4 +33,5 @@ export interface Pose {
   modifications?: string[];
   benefits?: string[];
   contraindications?: string[];
+  usage_count?: number;
 } 

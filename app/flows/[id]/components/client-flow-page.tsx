@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { SequenceEditor } from "./sequence-editor"
 import { useSupabase } from "@/components/providers"
 import { Loader2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Edit, ArrowLeft } from "lucide-react"
 
 interface ClientFlowPageProps {
   sequence: any
@@ -23,16 +24,8 @@ export function ClientFlowPage({ sequence, initialIsOwner }: ClientFlowPageProps
         const { data: { session } } = await supabase.auth.getSession()
         
         if (session?.user) {
-          console.log("Client flow page: User authenticated", {
-            userEmail: session.user.email,
-            userId: session.user.id,
-            sequenceUserId: sequence.user_id,
-            isOwner: session.user.id === sequence.user_id
-          })
-          
           setIsOwner(session.user.id === sequence.user_id)
         } else {
-          console.log("Client flow page: No authenticated user")
           setIsOwner(false)
         }
       } catch (error) {
@@ -55,5 +48,58 @@ export function ClientFlowPage({ sequence, initialIsOwner }: ClientFlowPageProps
     )
   }
 
-  return <SequenceEditor sequence={sequence} isOwner={isOwner} />
-} 
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <Button 
+          variant="ghost" 
+          onClick={() => router.push('/flows')}
+          className="flex items-center gap-2"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Flows
+        </Button>
+        
+        {isOwner && (
+          <Button 
+            onClick={() => router.push(`/edit/${sequence.id}`)}
+            className="flex items-center gap-2"
+          >
+            <Edit className="h-4 w-4" />
+            Edit Flow
+          </Button>
+        )}
+      </div>
+      
+      <div className="space-y-4">
+        <h1 className="text-2xl font-bold">{sequence.title || "Untitled Flow"}</h1>
+        {sequence.description && (
+          <p className="text-muted-foreground">{sequence.description}</p>
+        )}
+        
+        <div className="grid grid-cols-1 gap-4 mt-6">
+          {sequence.sequence_poses.map((item: any) => (
+            <div key={item.id} className="flex items-center gap-3 p-3 border rounded-md">
+              <div className="flex-1">
+                <h3 className="font-medium">{item.poses?.english_name || "Unknown Pose"}</h3>
+                {item.poses?.sanskrit_name && (
+                  <p className="text-sm text-muted-foreground">{item.poses.sanskrit_name}</p>
+                )}
+              </div>
+              {item.side && (
+                <div className="text-sm px-2 py-1 bg-muted rounded-md">
+                  {item.side}
+                </div>
+              )}
+              {item.duration && (
+                <div className="text-sm text-muted-foreground">
+                  {item.duration}s
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}

@@ -11,24 +11,6 @@ export interface SequenceParams {
   }
 }
 
-// New interface for the first step of sequence generation - the structure
-export interface SequenceStructure {
-  name: string
-  description: string
-  intention: string
-  segments: SequenceSegment[]
-}
-
-// More authentic terminology than "phase"
-export interface SequenceSegment {
-  name: string
-  description: string
-  durationMinutes: number
-  intensityLevel: number // 1-10
-  poseTypes: string[]
-  purpose: string
-}
-
 export interface SequencePose {
   id: string
   pose_id: string
@@ -50,6 +32,35 @@ export interface SequencePhase {
   name: string
   description?: string
   poses: SequencePose[]
+  
+  // Existing new fields
+  duration_minutes?: number
+  intensity_level?: number
+  pose_types?: string[]
+  purpose?: string
+  phase_type?: "centering" | "warm_up" | "building" | "peak" | "cool_down" | "closing"
+  position?: number
+  
+  // New fields for library/AI integration
+  difficulty_level?: "beginner" | "intermediate" | "advanced"
+  suitable_styles?: ("vinyasa" | "hatha" | "yin" | "power" | "restorative")[]
+  suitable_for_focus?: ("full body" | "upper body" | "lower body" | "core" | "balance" | "flexibility")[]
+  tags?: string[]
+  
+  // Library metadata
+  creator_id?: string
+  is_public?: boolean
+  usage_count?: number
+  created_at?: string
+  updated_at?: string
+  
+  // AI-friendly attributes
+  preparation_for?: string // e.g., "wheel pose" - what this phase helps prepare for
+  follows_well_after?: string[] // phases that this naturally follows
+  precedes_well_before?: string[] // phases that work well after this
+  
+  // Template status
+  is_template?: boolean // Is this a system template or user-created phase?
 }
 
 export interface Sequence {
