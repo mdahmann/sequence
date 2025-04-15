@@ -315,6 +315,48 @@ export const serverSequenceService = {
           if (dbError) {
             console.error("Error storing sequence:", dbError);
             // Don't throw error here, just log it
+          } else {
+            // Save phases and poses
+            for (let i = 0; i < sequence.phases.length; i++) {
+              const phase = sequence.phases[i];
+              const { error: phaseError } = await supabase
+                .from('sequence_phases')
+                .insert([{
+                  id: phase.id,
+                  sequence_id: sequence.id,
+                  name: phase.name,
+                  description: phase.description || '',
+                  position: i + 1,
+                  duration_minutes: Math.ceil((phase.poses?.reduce((total, pose) => total + (pose.duration_seconds || 0), 0) || 0) / 60)
+                }]);
+              if (phaseError) {
+                console.error(`Error storing phase ${phase.name}:`, phaseError);
+                continue;
+              }
+              // Save poses for this phase
+              for (let j = 0; j < (phase.poses?.length || 0); j++) {
+                const pose = phase.poses[j];
+                const { error: poseError } = await supabase
+                  .from('sequence_poses')
+                  .insert([{
+                    id: pose.id,
+                    sequence_id: sequence.id,
+                    phase_id: phase.id,
+                    pose_id: pose.pose_id,
+                    position: j + 1,
+                    duration: pose.duration_seconds,
+                    side: pose.side,
+                    side_option: pose.side_option,
+                    cues: pose.cues || null,
+                    transition: pose.transition || null,
+                    breath_cue: pose.breath_cue || null,
+                    modifications: Array.isArray(pose.modifications) ? pose.modifications : null
+                  }]);
+                if (poseError) {
+                  console.error(`Error storing pose ${pose.name} in phase ${phase.name}:`, poseError);
+                }
+              }
+            }
           }
           
           return sequence;
