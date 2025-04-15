@@ -128,7 +128,7 @@ export const serverSequenceService = {
           
           // Call OpenAI to generate the complete sequence
           const completion = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
+            model: "gpt-4.1-mini",
             temperature: 0.7,
             messages: [
               {
@@ -208,7 +208,7 @@ export const serverSequenceService = {
               
               // Make a follow-up request to get a more complete sequence
               const completionRequest = await openai.chat.completions.create({
-                model: "gpt-4o-mini",
+                model: "gpt-4.1-mini",
                 temperature: 0.7,
                 messages: [
                   {
@@ -349,7 +349,7 @@ export const serverSequenceService = {
   
   // Convert the filled sequence to our Sequence format
   convertToSequenceFormat(
-    filledSequence: any,
+    filledSequence: any, 
     poses: any[] = [], 
     params: SequenceParams
   ): Sequence {
@@ -381,25 +381,25 @@ export const serverSequenceService = {
     };
     
     // Map the generated phases
-    if (Array.isArray(filledSequence.phases)) {
-      sequence.phases = filledSequence.phases.map((phase: any, phaseIndex: number) => {
-        const sequencePhase: SequencePhase = {
-          id: uuidv4(),
-          name: phase.name,
-          description: phase.description || "",
-          poses: []
-        };
-        
-        // Map the poses in each phase
-        if (Array.isArray(phase.poses)) {
-          sequencePhase.poses = phase.poses.map((pose: any, poseIndex: number) => {
-            // Get the database pose ID, validate it exists
-            let poseId = pose.id || pose.pose_id || "unknown";
+      if (Array.isArray(filledSequence.phases)) {
+        sequence.phases = filledSequence.phases.map((phase: any, phaseIndex: number) => {
+          const sequencePhase: SequencePhase = {
+            id: uuidv4(),
+            name: phase.name,
+            description: phase.description || "",
+            poses: []
+          };
+          
+          // Map the poses in each phase
+          if (Array.isArray(phase.poses)) {
+            sequencePhase.poses = phase.poses.map((pose: any, poseIndex: number) => {
+              // Get the database pose ID, validate it exists
+              let poseId = pose.id || pose.pose_id || "unknown";
             let poseName = pose.name;
             let sanskritName = pose.sanskrit_name;
-            
+              
             // If we have the database poses, verify the ID exists and get the correct name
-            if (poseIdMap.size > 0) {
+              if (poseIdMap.size > 0) {
               const dbPose = poseIdMap.get(poseId);
               if (dbPose) {
                 poseName = dbPose.english_name || dbPose.name;
@@ -408,12 +408,12 @@ export const serverSequenceService = {
               } else if (pose.name) {
                 // If the ID doesn't exist but we have the name, try to find the pose by name
                 const poseNameLower = pose.name.toLowerCase();
-                const matchingPose = Array.from(poseIdMap.values()).find(
+                  const matchingPose = Array.from(poseIdMap.values()).find(
                   (p) => p.english_name?.toLowerCase() === poseNameLower || 
                          p.name?.toLowerCase() === poseNameLower
-                );
-                if (matchingPose) {
-                  poseId = matchingPose.id;
+                  );
+                  if (matchingPose) {
+                    poseId = matchingPose.id;
                   poseName = matchingPose.english_name || matchingPose.name;
                   sanskritName = matchingPose.sanskrit_name;
                   console.log(`Mapped pose name "${pose.name}" to ID ${poseId}, english_name=${poseName}`);
@@ -422,33 +422,33 @@ export const serverSequenceService = {
             }
             
             // Create a sequence pose with proper name handling
-            const sequencePose: SequencePose = {
-              id: uuidv4(),
-              pose_id: poseId,
+              const sequencePose: SequencePose = {
+                id: uuidv4(),
+                pose_id: poseId,
               name: poseName || pose.name || "Unknown Pose", // Always ensure we have an English name
-              duration_seconds: pose.duration_seconds || 30,
-              side: pose.side || null,
-              side_option: pose.side === "left" || pose.side === "right" ? "left_right" : pose.side_option || null,
-              cues: Array.isArray(pose.cues) ? pose.cues.join(", ") : (pose.cues || ""),
-              position: phaseIndex * 100 + poseIndex + 1,
+                duration_seconds: pose.duration_seconds || 30,
+                side: pose.side || null,
+                side_option: pose.side === "left" || pose.side === "right" ? "left_right" : pose.side_option || null,
+                cues: Array.isArray(pose.cues) ? pose.cues.join(", ") : (pose.cues || ""),
+                position: phaseIndex * 100 + poseIndex + 1,
               sanskrit_name: sanskritName || pose.sanskrit_name || "", // Sanskrit name as secondary
-              image_url: pose.image_url,
-              transition: pose.transition,
-              breath_cue: pose.breath_cue || pose.breath || "",
-              modifications: Array.isArray(pose.modifications) 
-                ? pose.modifications.join(", ") 
-                : (pose.modifications || "")
-            };
+                image_url: pose.image_url,
+                transition: pose.transition,
+                breath_cue: pose.breath_cue || pose.breath || "",
+                modifications: Array.isArray(pose.modifications) 
+                  ? pose.modifications.join(", ") 
+                  : (pose.modifications || "")
+              };
             
             console.log(`Created sequence pose: name=${sequencePose.name}, sanskrit_name=${sequencePose.sanskrit_name}`);
-            
-            return sequencePose;
-          });
-        }
-        
-        return sequencePhase;
-      });
-    }
+              
+              return sequencePose;
+            });
+          }
+          
+          return sequencePhase;
+        });
+      }
     
     console.log("Successfully converted to sequence format");
     
@@ -646,7 +646,7 @@ export const serverSequenceService = {
     console.log("serverSequenceService: Successfully generated basic sequence", sequence.name);
     return sequence;
   },
-  
+
   async setAuthToken(token: string, client: any) {
     // This method can be used to set an auth token directly on the client
     // Useful for API routes that receive an Authorization header
