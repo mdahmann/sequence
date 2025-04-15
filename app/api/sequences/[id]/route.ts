@@ -1,55 +1,54 @@
-import { NextResponse, NextRequest } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
-import type { Database } from '@/types/supabase'
+import { NextResponse } from 'next/server'
+import { createServerSupabaseClient } from '@/lib/supabase'
 
 export async function GET(
-  request: NextRequest,
+  request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Fully await the params object before destructuring
     const params = await context.params;
     const id = params.id;
+    
+    console.log(`API: Fetching sequence with ID: ${id}`);
+    
     if (!id) {
+      console.log('API: No ID provided');
       return NextResponse.json(
         { error: 'Sequence ID is required' },
         { status: 400 }
       )
     }
-    // Secure Supabase client with cookies from NextRequest
-    const supabase = createServerClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            return request.cookies.get(name)?.value;
-          },
-          set() {},
-          remove() {},
-        },
-      }
-    )
+    
+    const supabase = createServerSupabaseClient()
+    console.log(`API: Supabase client created, querying for sequence ID: ${id}`);
+    
     // Fetch sequence metadata
     const { data: sequence, error: sequenceError } = await supabase
       .from('sequences')
       .select('*')
       .eq('id', id)
       .single();
+
     if (sequenceError || !sequence) {
+      console.log(`API: No sequence found with ID: ${id}`);
       return NextResponse.json({ error: 'Sequence not found' }, { status: 404 });
     }
+
     // Fetch phases
-    const { data: phases } = await supabase
+    const { data: phases, error: phasesError } = await supabase
       .from('sequence_phases')
       .select('*')
       .eq('sequence_id', id)
       .order('position');
+
     // Fetch poses for all phases
-    const { data: poses } = await supabase
+    const { data: poses, error: posesError } = await supabase
       .from('sequence_poses')
       .select('*, poses(*)')
       .eq('sequence_id', id)
       .order('phase_id, position');
+
     // Assemble phases with their poses
     const phasesWithPoses = (phases || []).map(phase => ({
       ...phase,
@@ -71,6 +70,8 @@ export async function GET(
           modifications: p.modifications
         }))
     }));
+
+    console.log(`API: Successfully retrieved sequence: ${id}`);
     return NextResponse.json({
       id: sequence.id,
       name: sequence.title,
@@ -90,160 +91,10 @@ export async function GET(
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`API: Uncaught error fetching sequence: ${errorMessage}`, error);
     return NextResponse.json(
       { error: 'Internal server error', details: errorMessage },
       { status: 500 }
     )
-  }
-}
-
-export async function PATCH(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
-  try {
-    const params = await context.params;
-    const id = params.id;
-    if (!id) {
-      console.error('PATCH: No sequence ID provided');
-      return NextResponse.json(
-        { error: 'Sequence ID is required' },
-        { status: 400 }
-      );
-    }
-    // Secure Supabase client with cookies from NextRequest
-    const supabase = createServerClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            return request.cookies.get(name)?.value;
-          },
-          set() {},
-          remove() {},
-        },
-      }
-    )
-    const { data: { session } } = await supabase.auth.getSession();
-    console.log('PATCH: Session:', session);
-    if (!session?.user) {
-      console.error('PATCH: No authenticated user found');
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
-    }
-    // Verify user has access to this sequence
-    const { data: sequence, error: sequenceError } = await supabase
-      .from('sequences')
-      .select('user_id')
-      .eq('id', id)
-      .single();
-    console.log('PATCH: Sequence from DB:', sequence);
-    if (sequenceError) {
-      console.error('PATCH: Sequence fetch error:', sequenceError);
-    }
-    if (sequenceError || !sequence) {
-      return NextResponse.json(
-        { error: 'Sequence not found' },
-        { status: 404 }
-      );
-    }
-    if (sequence.user_id !== session.user.id) {
-      console.error('PATCH: User not authorized. Sequence user_id:', sequence.user_id, 'Session user id:', session.user.id);
-      return NextResponse.json(
-        { error: 'Not authorized to update this sequence' },
-        { status: 403 }
-      );
-    }
-    const updates = await request.json();
-    console.log('PATCH: Incoming update payload:', updates);
-    if (!updates) {
-      console.error('PATCH: No update data provided');
-      return NextResponse.json(
-        { error: 'No update data provided' },
-        { status: 400 }
-      );
-    }
-    const hasPhaseUpdates = updates.phases && Array.isArray(updates.phases);
-    try {
-      const { error: updateError } = await supabase
-        .from('sequences')
-        .update({
-          title: updates.name,
-          description: updates.description,
-          duration: updates.duration_minutes,
-          difficulty_level: updates.difficulty,
-          style: updates.style,
-          focus_area: updates.focus,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id);
-      if (updateError) {
-        console.error('PATCH: Failed to update sequence:', updateError);
-        throw new Error(`Failed to update sequence: ${updateError.message}`);
-      }
-      if (hasPhaseUpdates) {
-        for (const phase of updates.phases) {
-          if (!phase.id) continue;
-          const { error: phaseUpdateError } = await supabase
-            .from('sequence_phases')
-            .update({
-              name: phase.name,
-              description: phase.description,
-              position: phase.position,
-              duration_minutes: phase.duration_minutes,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', phase.id)
-            .eq('sequence_id', id);
-          if (phaseUpdateError) {
-            console.error(`PATCH: Failed to update phase ${phase.id}:`, phaseUpdateError);
-            throw new Error(`Failed to update phase ${phase.id}: ${phaseUpdateError.message}`);
-          }
-          if (phase.poses && Array.isArray(phase.poses)) {
-            for (const pose of phase.poses) {
-              if (!pose.id) continue;
-              const { error: poseUpdateError } = await supabase
-                .from('sequence_poses')
-                .update({
-                  position: pose.position,
-                  duration: pose.duration_seconds,
-                  side: pose.side,
-                  side_option: pose.side_option,
-                  cues: pose.cues,
-                  transition: pose.transition,
-                  breath_cue: pose.breath_cue,
-                  modifications: Array.isArray(pose.modifications) ? pose.modifications : null,
-                  updated_at: new Date().toISOString()
-                })
-                .eq('id', pose.id)
-                .eq('sequence_id', id);
-              if (poseUpdateError) {
-                console.error(`PATCH: Failed to update pose ${pose.id}:`, poseUpdateError);
-                throw new Error(`Failed to update pose ${pose.id}: ${poseUpdateError.message}`);
-              }
-            }
-          }
-        }
-      }
-      console.log('PATCH: Sequence update successful for id:', id);
-      return NextResponse.json({ success: true, id });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('PATCH: Error updating sequence:', errorMessage, error);
-      return NextResponse.json(
-        { error: 'Failed to update sequence', details: errorMessage },
-        { status: 500 }
-      );
-    }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('PATCH: Uncaught error updating sequence:', errorMessage, error);
-    return NextResponse.json(
-      { error: 'Internal server error', details: errorMessage },
-      { status: 500 }
-    );
   }
 } 

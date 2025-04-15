@@ -42,37 +42,6 @@ interface PoseData {
   english_name?: string
 }
 
-// Map Sequence object to backend PATCH API format
-function mapSequenceForSave(sequence: Sequence) {
-  return {
-    name: sequence.name,
-    description: sequence.description,
-    duration_minutes: sequence.duration_minutes,
-    difficulty: sequence.difficulty,
-    style: sequence.style,
-    focus: sequence.focus,
-    phases: sequence.phases.map(phase => ({
-      id: phase.id,
-      name: phase.name,
-      description: phase.description,
-      position: phase.position,
-      duration_minutes: phase.duration_minutes,
-      // Only include fields the backend expects for PATCH
-      poses: phase.poses.map(pose => ({
-        id: pose.id,
-        position: pose.position,
-        duration_seconds: pose.duration_seconds,
-        side: pose.side,
-        side_option: pose.side_option,
-        cues: pose.cues,
-        transition: pose.transition,
-        breath_cue: pose.breath_cue,
-        modifications: Array.isArray(pose.modifications) ? pose.modifications : [],
-      }))
-    }))
-  };
-}
-
 export default function SequenceEditorPage() {
   const params = useParams()
   const router = useRouter()
@@ -215,56 +184,34 @@ export default function SequenceEditorPage() {
     }
   }, [isLoading, isPosesLoading]);
   
-  // Refactored sequence loading logic
+  // Fetch sequence data from API only (no localStorage)
   useEffect(() => {
     if (!sequenceId) {
-      router.push('/');
-      return;
+      router.push('/')
+      return
     }
 
     const fetchSequence = async () => {
-      setIsLoading(true);
       try {
-        // Always try API first
-        const response = await fetch(`/api/sequences/${sequenceId}?t=${Date.now()}`);
-        if (response.ok) {
-          const data = await response.json();
-          setSequence(data);
-          setIsPosesLoading(false);
-          // Remove from localStorage if present
-          const localSequences = localStorage.getItem("generatedSequences");
-          if (localSequences) {
-            const sequences = JSON.parse(localSequences);
-            const filtered = sequences.filter((seq: any) => seq.id !== sequenceId);
-            localStorage.setItem("generatedSequences", JSON.stringify(filtered));
-          }
-          return;
+        setIsLoading(true)
+        const response = await fetch(`/api/sequences/${sequenceId}`)
+        if (!response.ok) {
+          showToast("Sequence not found", "error")
+          router.push('/')
+          return
         }
-        if (response.status === 404) {
-          // Only now check localStorage
-          const localSequences = localStorage.getItem("generatedSequences");
-          if (localSequences) {
-            const sequences = JSON.parse(localSequences);
-            const localSequence = sequences.find((seq: any) => seq.id === sequenceId);
-            if (localSequence) {
-              setSequence(localSequence);
-              setIsPosesLoading(false);
-              return;
-            }
-          }
-          showToast("Sequence not found", "error");
-          router.push('/');
-        }
+        const data = await response.json()
+        setSequence(data)
       } catch (error) {
-        showToast("Failed to load sequence", "error");
-        router.push('/');
+        showToast("Failed to load sequence", "error")
+        router.push('/')
       } finally {
-        setIsLoading(false);
+        setIsLoading(false)
       }
-    };
+    }
 
-    fetchSequence();
-  }, [sequenceId, showToast, router]);
+    fetchSequence()
+  }, [sequenceId, showToast, router])
   
   // Beta feature - load a sample sequence if none found
   const loadSampleSequence = () => {
@@ -628,35 +575,33 @@ export default function SequenceEditorPage() {
   }
 
   const handleSave = async () => {
-    if (!sequence) return;
+    if (!sequence) return
+
     try {
-      setIsSaving(true);
-      showToast("Saving sequence...", "success");
-      const response = await fetch(`/api/sequences/${sequenceId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(mapSequenceForSave(sequence)),
-        credentials: 'include', // <-- This is critical!
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to save sequence');
-      }
-      // Refetch from API to ensure state is up to date
-      const updated = await fetch(`/api/sequences/${sequenceId}`);
-      if (updated.ok) {
-        setSequence(await updated.json());
-      }
-      setHasUnsavedChanges(false);
-      showToast("Sequence saved successfully", "success");
-      saveToHistory(sequence, "Saved sequence");
+      const sequencesJson = localStorage.getItem("generatedSequences")
+      const sequences = sequencesJson ? JSON.parse(sequencesJson) : []
+      
+      const updatedSequences = sequences.map((seq: Sequence) => 
+        seq.id === sequence.id ? sequence : seq
+      )
+      
+      localStorage.setItem("generatedSequences", JSON.stringify(updatedSequences))
+      setHasUnsavedChanges(false)
+      showToast("Sequence saved successfully", "success")
+      
+      // Add save action to history
+      saveToHistory(sequence, "Saved sequence")
+      
+      // Ensure all phases remain expanded using the helper
       ensureAllPhasesExpanded();
-      if (isExiting) router.push('/');
+
+      // If we were exiting, now we can safely exit
+      if (isExiting) {
+        router.push('/')
+      }
     } catch (error) {
-      console.error("Error saving sequence:", error);
-      showToast("Failed to save sequence", "error");
-    } finally {
-      setIsSaving(false);
+      console.error("Error saving sequence:", error)
+      showToast("Failed to save sequence", "error")
     }
   }
   
