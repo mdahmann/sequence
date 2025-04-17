@@ -29,6 +29,10 @@ Please expand the sequence by:
 - Follow standard sequencing principles for {{style}} yoga
 - Ensure bilateral poses have both left and right sides
 
+## AVAILABLE POSES FOR EXPANSION
+**When adding or modifying poses to meet the target duration and count, you MUST select ONLY from the following list of available poses. Ensure the `pose_id` in your response exactly matches the ID from this list for every pose:**
+{{poseList}}
+
 ## Validation Steps
 Before submitting your response, please verify:
 1. Count the total duration of all poses in seconds

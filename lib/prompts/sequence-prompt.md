@@ -44,9 +44,10 @@ Create a complete {{style}} yoga sequence with the following parameters:
 - Validate your sequence by calculating the total time of all poses before submitting
 
 ## AVAILABLE POSES
+**Use ONLY the poses listed below. Ensure the `pose_id` in your response exactly matches the ID from this list for every pose you include:**
 {{poseList}}
 
-For bilateral poses, you MUST include both sides one after another. 
+For bilateral poses, you MUST include both sides in the sequence, but they don't have to be one right after the other. 
 
 ## CORRECT EXAMPLE
 ```json

@@ -45,11 +45,13 @@ const filledSequenceSchema = {
             items: {
               type: "object",
               properties: {
-                name: { type: "string" },
-                description: { type: "string" },
-                sanskrit_name: { 
+                pose_id: { 
                   type: "string", 
-                  description: "The Sanskrit name of the pose - this field is REQUIRED" 
+                  description: "The exact ID of the pose from the provided pose list. This field is REQUIRED and MUST match an ID from the list." 
+                },
+                name: { 
+                  type: "string", 
+                  description: "The common English name of the pose. This should match the name associated with the provided pose_id." 
                 },
                 duration_seconds: { type: "number" },
                 side: { type: "string", enum: ["left", "right", "both", null] },
@@ -64,7 +66,8 @@ const filledSequenceSchema = {
                   items: { type: "string" }
                 }
               },
-              required: ["name", "sanskrit_name", "duration_seconds"]
+              // Make pose_id required, keep duration required, name is good practice but let mapping handle it
+              required: ["pose_id", "duration_seconds"] 
             }
           }
         },
@@ -201,7 +204,8 @@ export const serverSequenceService = {
                 expectedPoseCount,
                 totalPoses,
                 totalDurationSeconds,
-                expectedDurationSeconds
+                expectedDurationSeconds,
+                poseList
               );
               
               console.log("\n========== SENDING VALIDATION PROMPT ==========");
@@ -395,12 +399,19 @@ export const serverSequenceService = {
     console.log("Converting sequence to format...");
     const now = new Date().toISOString();
     
-    // Create lookup map for pose validation
-    const poseIdMap = new Map();
+    // Create lookup map for pose validation using the database pose ID
+    const poseIdMap = new Map<string, any>(); // Explicitly type the map key as string
     if (poses.length > 0) {
       poses.forEach(pose => {
-        poseIdMap.set(pose.id, pose);
+        if (pose.id) { // Ensure the pose has an ID
+          poseIdMap.set(pose.id.toString(), pose); // Ensure ID is stored as string
+        } else {
+          console.warn(`Pose missing ID, cannot add to map: ${pose.english_name || pose.name}`);
+        }
       });
+      console.log(`Created poseIdMap with ${poseIdMap.size} poses.`);
+    } else {
+      console.warn("No poses provided to convertToSequenceFormat. Pose validation will be skipped.");
     }
     
     // Create the sequence object
@@ -431,58 +442,54 @@ export const serverSequenceService = {
           
           // Map the poses in each phase
           if (Array.isArray(phase.poses)) {
-            sequencePhase.poses = phase.poses.map((pose: any, poseIndex: number) => {
-              // Get the database pose ID, validate it exists
-              let poseId = pose.id || pose.pose_id || "unknown";
-            let poseName = pose.name;
-            let sanskritName = pose.sanskrit_name;
-              
-            // If we have the database poses, verify the ID exists and get the correct name
-              if (poseIdMap.size > 0) {
-              const dbPose = poseIdMap.get(poseId);
-              if (dbPose) {
-                poseName = dbPose.english_name || dbPose.name;
-                sanskritName = dbPose.sanskrit_name;
-                console.log(`Found pose in DB: ID=${poseId}, english_name=${poseName}, name=${dbPose.name}`);
-              } else if (pose.name) {
-                // If the ID doesn't exist but we have the name, try to find the pose by name
-                const poseNameLower = pose.name.toLowerCase();
-                  const matchingPose = Array.from(poseIdMap.values()).find(
-                  (p) => p.english_name?.toLowerCase() === poseNameLower || 
-                         p.name?.toLowerCase() === poseNameLower
-                  );
-                  if (matchingPose) {
-                    poseId = matchingPose.id;
-                  poseName = matchingPose.english_name || matchingPose.name;
-                  sanskritName = matchingPose.sanskrit_name;
-                  console.log(`Mapped pose name "${pose.name}" to ID ${poseId}, english_name=${poseName}`);
+            // Use filter and map to handle potentially discarded poses
+            sequencePhase.poses = phase.poses
+              .map((aiPose: any, poseIndex: number): SequencePose | null => {
+                // Get the pose ID from the AI response. MUST be present due to schema change.
+                const aiPoseId = aiPose.pose_id?.toString(); // Ensure it's a string
+                
+                if (!aiPoseId) {
+                  console.warn(`AI Pose missing required 'pose_id' field in phase "${phase.name}", index ${poseIndex}. Skipping pose:`, aiPose);
+                  return null; // Skip this pose if ID is missing
                 }
-              }
-            }
-            
-            // Create a sequence pose with proper name handling
-              const sequencePose: SequencePose = {
-                id: uuidv4(),
-                pose_id: poseId,
-              name: poseName || pose.name || "Unknown Pose", // Always ensure we have an English name
-                duration_seconds: pose.duration_seconds || 30,
-                side: pose.side || null,
-                side_option: pose.side === "left" || pose.side === "right" ? "left_right" : pose.side_option || null,
-                cues: Array.isArray(pose.cues) ? pose.cues.join(", ") : (pose.cues || ""),
-                position: phaseIndex * 100 + poseIndex + 1,
-              sanskrit_name: sanskritName || pose.sanskrit_name || "", // Sanskrit name as secondary
-                image_url: pose.image_url,
-                transition: pose.transition,
-                breath_cue: pose.breath_cue || pose.breath || "",
-                modifications: Array.isArray(pose.modifications) 
-                  ? pose.modifications.join(", ") 
-                  : (pose.modifications || "")
-              };
-            
-            console.log(`Created sequence pose: name=${sequencePose.name}, sanskrit_name=${sequencePose.sanskrit_name}`);
-              
-              return sequencePose;
-            });
+
+                // --- Strict Mapping Logic ---
+                // Look up the pose strictly by the ID provided by the AI
+                const dbPose = poseIdMap.get(aiPoseId);
+
+                if (!dbPose) {
+                  // If the ID doesn't exist in our database map, discard the pose.
+                  console.warn(`AI generated pose with ID "${aiPoseId}" (Name: "${aiPose.name}") not found in database pose list. Discarding this pose from phase "${phase.name}".`);
+                  return null; // Discard invalid pose
+                }
+
+                // If found, use data from the database pose as the source of truth for name, sanskrit_name, etc.
+                console.log(`Successfully mapped AI pose ID "${aiPoseId}" to DB Pose: ${dbPose.english_name || dbPose.name}`);
+                
+                // Create the sequence pose using DB data primarily, falling back to AI only for duration, side, cues etc.
+                const sequencePose: SequencePose = {
+                  id: uuidv4(), // Generate a new unique ID for this instance in the sequence
+                  pose_id: dbPose.id, // Use the validated database pose ID
+                  name: dbPose.english_name || dbPose.name || "Unknown Pose", // Use DB name
+                  sanskrit_name: dbPose.sanskrit_name || "", // Use DB Sanskrit name
+                  duration_seconds: aiPose.duration_seconds || 30, // Use AI duration
+                  side: aiPose.side || null, // Use AI side
+                  side_option: dbPose.side_option || (aiPose.side === "left" || aiPose.side === "right" ? "left_right" : null), // Use DB side_option, fallback logic if needed
+                  cues: Array.isArray(aiPose.cues) ? aiPose.cues.join(", ") : (aiPose.cues || ""), // Use AI cues
+                  position: 0, // Position will be set later after filtering
+                  image_url: dbPose.image_url, // Use DB image URL
+                  transition: aiPose.transition, // Use AI transition
+                  breath_cue: aiPose.breath_cue || aiPose.breath || "", // Use AI breath cue
+                  modifications: Array.isArray(aiPose.modifications) 
+                    ? aiPose.modifications.join(", ") 
+                    : (aiPose.modifications || "") // Use AI modifications
+                };
+                
+                // console.log(`Created sequence pose: name=${sequencePose.name}, sanskrit_name=${sequencePose.sanskrit_name}`);
+                return sequencePose;
+              })
+              .filter((pose: SequencePose | null): pose is SequencePose => pose !== null) // Filter out null (discarded) poses
+              .map((pose: SequencePose, index: number) => ({ ...pose, position: index + 1 })); // Set correct position after filtering
           }
           
           return sequencePhase;

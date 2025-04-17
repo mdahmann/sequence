@@ -100,7 +100,8 @@ export async function generateValidationPrompt(
   expectedPoseCount: number,
   totalPoses: number,
   totalDurationSeconds: number,
-  expectedDurationSeconds: number
+  expectedDurationSeconds: number,
+  poseList: string
 ): Promise<string> {
   // Calculate duration values for the prompt
   const currentMinutes = Math.floor(totalDurationSeconds / 60);
@@ -139,7 +140,8 @@ export async function generateValidationPrompt(
     focus: params.focus,
     difficulty: params.difficulty,
     phases: phaseText, // Replace the handlebars-style {{#each phases}} with formatted text
-    target_pose_count: targetPoseCount.toString()
+    target_pose_count: targetPoseCount.toString(),
+    poseList: poseList
   };
   
   return loadPromptTemplate('sequence-validation', replacements);
